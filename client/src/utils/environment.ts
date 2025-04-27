@@ -28,7 +28,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 // כתובת ה-Google Apps Script
 export const GOOGLE_APPS_SCRIPT_URL = import.meta.env.VITE_GOOGLE_APPS_SCRIPT_URL || 
-  'https://script.google.com/macros/s/AKfycbx8ftq3eyD4Xi7CYvjfWy42FFFKbI9Vdw9NBowx-EUa0zVe6jbKSdmWl0eikqbQGSom/exec';
+  'https://script.google.com/macros/s/AKfycbxivT91bM88xJ3NxXnxmDMDdcr2Zzu8Kyb_8X-bGH5YjLUVTljGxAxUeWDK8uJ94fSGRQ/exec';
 
 // פונקציה להמרת נתיבי API בהתאם לסביבה
 // נשמרת לצורך תאימות עם קוד קיים
