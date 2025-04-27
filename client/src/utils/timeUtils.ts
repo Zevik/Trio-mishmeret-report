@@ -33,3 +33,65 @@ export function isValidTimeFormat(time: string): boolean {
   const timeRegex = /^([0-1][0-9]|2[0-3]):([0-5][0-9])$/;
   return timeRegex.test(time);
 }
+
+/**
+ * ממיר שעות:דקות למספר דקות
+ */
+export const timeToMinutes = (timeStr: string): number => {
+  if (!timeStr) return 0;
+  
+  try {
+    // בדיקה לפורמט HH:MM
+    const match = timeStr.match(/(\d+):(\d+)/);
+    if (match) {
+      const hours = parseInt(match[1], 10);
+      const minutes = parseInt(match[2], 10);
+      return (hours * 60) + minutes;
+    }
+    
+    // אם זה מספר, נניח שזה שעות
+    const directValue = parseFloat(timeStr);
+    if (!isNaN(directValue)) {
+      return Math.round(directValue * 60); // המרת שעות לדקות
+    }
+    
+    return 0;
+  } catch (error) {
+    console.error('Error converting time to minutes:', error);
+    return 0;
+  }
+};
+
+/**
+ * מעצב דקות לפורמט של שעות:דקות
+ */
+export const formatHoursMinutes = (minutes: number): string => {
+  if (isNaN(minutes) || minutes < 0) return '00:00';
+  
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  
+  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+};
+
+/**
+ * מחשב את משך הזמן בדקות בין שתי שעות בפורמט HH:MM
+ */
+export const calculateDurationMinutes = (startTime: string, endTime: string): number => {
+  if (!startTime || !endTime) return 0;
+  
+  try {
+    const startMinutes = timeToMinutes(startTime);
+    const endMinutes = timeToMinutes(endTime);
+    
+    // טיפול במקרה של יום חדש (כאשר שעת הסיום קטנה משעת ההתחלה)
+    if (endMinutes < startMinutes) {
+      return (24 * 60) - startMinutes + endMinutes;
+    }
+    
+    return endMinutes - startMinutes;
+  } catch (error) {
+    console.error('Error calculating duration:', error);
+    return 0;
+  }
+};

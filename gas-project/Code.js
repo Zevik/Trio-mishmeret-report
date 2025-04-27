@@ -269,99 +269,31 @@ function getInstructorsData() {
 }
 
 /**
- * פונקציה לשליפת דוח שעות של רפואנים - מחזירה נתונים בלבד
+ * פונקציה לשליפת נתוני דוח משמרות
  */
 function getShiftReportData() {
   try {
-    console.log(`Getting shift report data`);
+    console.log('Fetching shift report data from Shift_card');
     
     // פתיחת הגיליון
     const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
     const sheet = spreadsheet.getSheetByName(SHIFT_CARD_SHEET_NAME);
     
     if (!sheet) {
-      return { error: `גיליון ${SHIFT_CARD_SHEET_NAME} לא נמצא`, statusCode: 404 };
+      return { 
+        error: `גיליון ${SHIFT_CARD_SHEET_NAME} לא נמצא`, 
+        statusCode: 404 
+      };
     }
     
     // קריאת כל הנתונים מהגיליון
     const data = sheet.getDataRange().getValues();
-    const headers = data[0]; // שורת הכותרות
     
-    // רישום כותרות לדיבוג
-    console.log('Sheet headers:', headers);
+    console.log(`Retrieved ${data.length} rows from ${SHIFT_CARD_SHEET_NAME}`);
     
-    // מציאת אינדקס העמודות הנכון (לפי הכותרות, אם אפשר)
-    let doctorNameIndex = -1;  // אינדקס עמודת שם הרפואן
-    let dateIndex = -1;        // אינדקס עמודת תאריך
-    let calculatedHoursIndex = -1; // אינדקס עמודת שעות מחושבות
-    let manualHoursIndex = -1;     // אינדקס עמודת שעות ידניות
-    
-    // חיפוש האינדקסים לפי שמות העמודות
-    for (let i = 0; i < headers.length; i++) {
-      const header = headers[i].toString().trim().toLowerCase();
-      
-      if (header === 'שם' || header.includes('רפואן') || header.includes('רופא')) {
-        doctorNameIndex = i;
-      }
-      else if (header === 'תאריך' || header.includes('תאריך')) {
-        dateIndex = i;
-      }
-      else if (header === 'משך' || header.includes('מחושב')) {
-        calculatedHoursIndex = i;
-      }
-      else if (header.includes('ידני')) {
-        manualHoursIndex = i;
-      }
-    }
-    
-    // שימוש באינדקסים ספציפיים כפי שהוגדרו בדרישות
-    doctorNameIndex = 1;  // עמודה B (אינדקס 1) - שם הרפואן
-    dateIndex = 0;        // עמודה A (אינדקס 0) - חותמת זמן כתאריך
-    calculatedHoursIndex = 7; // עמודה H (אינדקס 7) - שעות מחושבות
-    manualHoursIndex = 8;     // עמודה I (אינדקס 8) - שעות ידניות
-    
-    // לוג אודות המיפוי שנמצא
-    console.log(`Column indices - Doctor: ${doctorNameIndex}, Date: ${dateIndex}, CalcHours: ${calculatedHoursIndex}, ManualHours: ${manualHoursIndex}`);
-    
-    try {
-      // רישום דוגמה של הכותרות
-      console.log('Column headers sample - B:', headers[1], ', D:', headers[3], ', E:', headers[4]);
-      // רישום דוגמה של שורת נתונים ראשונה
-      if (data.length > 1) {
-        console.log('First row sample - B:', data[1][1], ', D:', data[1][3], ', E:', data[1][4]);
-      }
-    } catch(e) {
-      console.log('Error logging headers:', e);
-    }
-    
-    // מערך לשמירת נתוני המשמרות
-    const shifts = [];
-    
-    // קריאת נתוני המשמרות
-    for (let i = 1; i < data.length; i++) { // מתחילים מ-1 כדי לדלג על כותרות
-      const row = data[i];
-      
-      // שליפת הנתונים הרלוונטיים מהשורה
-      const doctorName = row[doctorNameIndex] || '';
-      const date = row[dateIndex] || '';
-      const calculatedHours = row[calculatedHoursIndex] || '';
-      const manualHours = row[manualHoursIndex] || '';
-      
-      // בדיקה שיש תאריך תקין
-      const isValidDate = date.toString().includes('/');
-      
-      if (isValidDate) {
-        // הוספת נתוני המשמרת למערך
-        shifts.push({
-          doctorName: doctorName.toString(),
-          date: date.toString(),
-          calculatedHours: calculatedHours.toString(),
-          manualHours: manualHours.toString()
-        });
-      }
-    }
-    
-    console.log(`Found ${shifts.length} valid shift records`);
+    // הסרת שורת הכותרות והמרה לפורמט JSON
+    const headers = data[0];
+    const shifts = data.slice(1).map(row => row);
     
     return {
       success: true,
@@ -369,8 +301,11 @@ function getShiftReportData() {
       statusCode: 200
     };
   } catch (error) {
-    console.error(`Error in getShiftReport: ${error.toString()}`);
-    return { error: 'שגיאה בשליפת דוח שעות: ' + error.toString(), statusCode: 500 };
+    console.error(`Error in getShiftReportData: ${error.toString()}`);
+    return { 
+      error: 'שגיאה בשליפת נתוני דוח: ' + error.toString(),
+      statusCode: 500 
+    };
   }
 }
 
@@ -780,7 +715,8 @@ function getInstructors() {
  * פונקציה לשליפת דוח שעות - גרסה ישנה
  */
 function getShiftReport() {
-  return createJsonResponse(getShiftReportData());
+  const reportData = getShiftReportData();
+  return createJsonResponse(reportData, reportData.statusCode || 500);
 }
 
 /**
