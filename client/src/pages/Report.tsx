@@ -9,6 +9,9 @@ import { buildGASUrl } from '../utils/environment';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchMonthlyReport, parseDate } from '@/utils/reportUtils';
 import { formatHoursMinutes } from '@/utils/timeUtils';
+import { FormControl, FormLabel } from "@/components/ui/form";
+import { MenuItem } from "@/components/ui/menu";
+import { Box, Typography } from "@/components/ui/ui";
 
 // סוג נתונים עבור משמרת
 interface Shift {
@@ -89,73 +92,204 @@ const Report = () => {
     return medicHours;
   };
 
-  const extractMonths = (shifts: ShiftRecord[]) => {
-    const months = new Set<string>();
+  const extractMonths = (data: ShiftRecord[]): string[] => {
+    console.log('extractMonths: starting with data length:', data.length);
     
-    shifts.forEach(shift => {
-      // שימוש בפונקציית parseDate לחילוץ תאריך
-      const parsedDate = parseDate(shift.date);
-      if (parsedDate) {
-        const monthYear = parsedDate.toLocaleDateString('he-IL', {
-          month: 'long',
-          year: 'numeric'
+    try {
+      const months = new Set<string>();
+      
+      // בדיקת תקינות נתונים
+      if (!Array.isArray(data)) {
+        console.error('extractMonths: data is not an array:', typeof data);
+        return [];
+      }
+      
+      // מעבר על כל הנתונים וחילוץ חודשים ייחודיים
+      data.forEach((item, index) => {
+        if (!item || !item.date) {
+          console.warn(`extractMonths: item at index ${index} has no date:`, item);
+          return;
+        }
+        
+        try {
+          const dateStr = item.date;
+          console.log(`extractMonths: processing date "${dateStr}" from item ${index}`);
+          
+          const parsedDate = parseDate(dateStr);
+          if (!parsedDate) {
+            console.warn(`extractMonths: could not parse date "${dateStr}" from item ${index}`);
+            return;
+          }
+          
+          const monthFormat = parsedDate.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
+          console.log(`extractMonths: extracted month format: "${monthFormat}" from date ${dateStr}`);
+          
+          months.add(monthFormat);
+        } catch (e) {
+          console.error(`extractMonths: Error processing item at index ${index}:`, e);
+        }
+      });
+      
+      // המרה למערך וסידור
+      const uniqueMonths = Array.from(months);
+      console.log('extractMonths: pre-sort months:', uniqueMonths);
+      
+      try {
+        uniqueMonths.sort((a, b) => {
+          console.log(`Comparing: "${a}" vs "${b}"`);
+          
+          // חילוץ שנה וחודש
+          const aParts = a.split(' ');
+          const bParts = b.split(' ');
+          
+          if (aParts.length < 2 || bParts.length < 2) {
+            console.warn(`extractMonths: Invalid month format - a: "${a}", parts: ${aParts.length}, b: "${b}", parts: ${bParts.length}`);
+            return 0;
+          }
+          
+          const aMonth = aParts[0];
+          const aYear = parseInt(aParts[1], 10);
+          const bMonth = bParts[0];
+          const bYear = parseInt(bParts[1], 10);
+          
+          console.log(`a: month=${aMonth}, year=${aYear}, b: month=${bMonth}, year=${bYear}`);
+          
+          // השוואה לפי שנים
+          if (aYear !== bYear) {
+            return bYear - aYear; // סדר יורד - חדש לישן
+          }
+          
+          // אם השנים שוות, השוואה לפי חודש
+          const aMonthIndex = getMonthIndex(aMonth);
+          const bMonthIndex = getMonthIndex(bMonth);
+          
+          console.log(`Month indices: a=${aMonthIndex}, b=${bMonthIndex}`);
+          
+          return bMonthIndex - aMonthIndex; // סדר יורד - חדש לישן
         });
-        months.add(monthYear);
-        console.log(`Extracted month: ${monthYear} from date: ${shift.date}`);
+      } catch (e) {
+        console.error('extractMonths: Error during sorting:', e);
+      }
+      
+      // הוספת אופציית "כל החודשים"
+      if (uniqueMonths.length > 0) {
+        // אופציית "כל החודשים" תתווסף בקומפוננטה עצמה
+        console.log('extractMonths: extracted and sorted unique months:', uniqueMonths);
       } else {
-        console.warn(`Failed to parse date: ${shift.date}`);
+        console.log('extractMonths: no months found');
       }
-    });
+      
+      return uniqueMonths;
+    } catch (e) {
+      console.error('extractMonths: global error:', e);
+      return [];
+    }
+  };
+
+  // פונקציית עזר להמרת שם חודש עברי לאינדקס
+  const getMonthIndex = (hebrewMonth: string): number => {
+    const hebrewMonths = [
+      'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
+      'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
+    ];
     
-    return Array.from(months).sort((a, b) => {
-      // Custom sort for Hebrew months
-      const [monthA, yearA] = a.split(' ');
-      const [monthB, yearB] = b.split(' ');
-      
-      if (yearA !== yearB) {
-        return parseInt(yearA) - parseInt(yearB);
-      }
-      
-      // Hebrew month order logic
-      const hebrewMonths = [
-        'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 
-        'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
-      ];
-      
-      return hebrewMonths.indexOf(monthA) - hebrewMonths.indexOf(monthB);
-    });
+    const index = hebrewMonths.indexOf(hebrewMonth);
+    if (index === -1) {
+      console.warn(`getMonthIndex: unknown Hebrew month "${hebrewMonth}"`);
+      return 0;
+    }
+    
+    return index;
   };
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
+        console.log(`loadData: Fetching report data...`);
         const data = await fetchMonthlyReport();
+        console.log(`loadData: Received ${data?.length || 0} records from API`);
+        console.log(`loadData: First record sample:`, data && data.length > 0 ? data[0] : 'No data');
         
         // Convert data from Google Sheets format to our format
-        const formattedData: ShiftRecord[] = data.map((row: any, index: number) => ({
-          id: `${index}`,
-          date: row[4], // E column - תאריך המשמרת
-          medicName: row[1], // B column - שם רפואן
-          shiftType: row[2], // C column - סוג המשמרת
-          doctorName: row[3], // D column - שם הרופא
-          startTime: row[5], // F column - שעת התחלה
-          endTime: row[6], // G column - שעת סיום
-          totalHours: row[7], // H column - משך המשמרת מחושב
-          reportedHours: row[8] || null, // I column - משך משמרת מדווח
-        }));
+        const formattedData: ShiftRecord[] = data.map((row: any, index: number) => {
+          const record = {
+            id: `${index}`,
+            date: row[4], // E column - תאריך המשמרת
+            medicName: row[1], // B column - שם רפואן
+            shiftType: row[2], // C column - סוג המשמרת
+            doctorName: row[3], // D column - שם הרופא
+            startTime: row[5], // F column - שעת התחלה
+            endTime: row[6], // G column - שעת סיום
+            totalHours: row[7], // H column - משך המשמרת מחושב
+            reportedHours: row[8] || null, // I column - משך משמרת מדווח
+          };
+          
+          if (index < 5) {
+            console.log(`loadData: Formatted record #${index}:`, record);
+          }
+          
+          return record;
+        });
+        
+        console.log(`loadData: Formatted ${formattedData.length} records`);
+        
+        // בדיקת תאריכים
+        console.log(`loadData: Validating date formats...`);
+        const dateSamples = new Map<string, number>();
+        const invalidDates: {index: number, date: string}[] = [];
+        
+        formattedData.forEach((record, index) => {
+          const dateStr = record.date;
+          if (!dateStr) {
+            invalidDates.push({index, date: 'empty'});
+            return;
+          }
+          
+          // מעקב אחר פורמטים של תאריכים
+          dateSamples.set(dateStr, (dateSamples.get(dateStr) || 0) + 1);
+          
+          // ניסיון לפרסר תאריך
+          const parsedDate = parseDate(dateStr);
+          if (!parsedDate) {
+            invalidDates.push({index, date: dateStr});
+          }
+        });
+        
+        // הצגת סטטיסטיקה על התאריכים
+        console.log(`loadData: Found ${dateSamples.size} unique date formats`);
+        console.log(`loadData: Date format samples:`, 
+          Array.from(dateSamples.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10)
+            .map(([format, count]) => `"${format}" (${count} occurrences)`)
+        );
+        
+        if (invalidDates.length > 0) {
+          console.warn(`loadData: Found ${invalidDates.length} records with invalid dates`);
+          console.warn(`loadData: First 5 invalid dates:`, invalidDates.slice(0, 5));
+        }
         
         setReportData(formattedData);
         setFilteredData(formattedData);
         
         // Extract available months
+        console.log(`loadData: Extracting available months...`);
         const months = extractMonths(formattedData);
-        setAvailableMonths(months);
+        console.log(`loadData: Extracted months array:`, months);
         
         // If months available, select the latest one
         if (months.length > 0) {
-          setSelectedMonth(months[months.length - 1]);
+          // הוספת אופציית "כל החודשים"
+          setAvailableMonths(months);
+          
+          // בחירת החודש האחרון כברירת מחדל (החודש העדכני ביותר)
+          const latestMonth = months[0]; // אנחנו כבר מסדרים מהחדש לישן
+          console.log(`loadData: Setting selected month to latest: "${latestMonth}"`);
+          setSelectedMonth(latestMonth);
         } else {
+          console.log(`loadData: No months available, setting to "all"`);
+          setAvailableMonths([]);
           setSelectedMonth('all');
         }
         
@@ -171,20 +305,47 @@ const Report = () => {
 
   // Update filtered data and summary when filters change
   useEffect(() => {
+    console.log('Filter effect triggered - selectedMonth:', selectedMonth, 'searchTerm:', searchTerm);
+    console.log('Current reportData length:', reportData.length);
+    
+    if (reportData.length === 0) {
+      console.warn('No report data available to filter');
+      return;
+    }
+
     let filtered = [...reportData];
     
     // Filter by month
     if (selectedMonth && selectedMonth !== 'all') {
+      console.log(`Filtering by month: "${selectedMonth}"`);
       filtered = filtered.filter(shift => {
-        const parsedDate = parseDate(shift.date);
-        if (!parsedDate) return false;
-        
-        const monthYear = parsedDate.toLocaleDateString('he-IL', {
-          month: 'long',
-          year: 'numeric'
-        });
-        return monthYear === selectedMonth;
+        try {
+          const dateStr = shift.date;
+          console.log(`Evaluating date: "${dateStr}" for filter: "${selectedMonth}"`);
+          
+          const parsedDate = parseDate(dateStr);
+          if (!parsedDate) {
+            console.warn(`Could not parse date: "${dateStr}" - excluding from filter`);
+            return false;
+          }
+          
+          const monthYear = parsedDate.toLocaleDateString('he-IL', {
+            month: 'long',
+            year: 'numeric'
+          });
+          
+          const matches = monthYear === selectedMonth;
+          console.log(`Date "${dateStr}" parsed to month-year: "${monthYear}" - matches filter: ${matches}`);
+          
+          return matches;
+        } catch (e) {
+          console.error(`Error filtering date "${shift.date}":`, e);
+          return false;
+        }
       });
+      console.log(`After month filtering: ${filtered.length} records remain`);
+    } else {
+      console.log(`No month filtering applied (all months selected)`);
     }
     
     // Filter by search term
@@ -195,6 +356,7 @@ const Report = () => {
       );
     }
     
+    console.log(`Final filtered data length: ${filtered.length}`);
     setFilteredData(filtered);
     
     // Calculate summary
@@ -215,21 +377,45 @@ const Report = () => {
             <>
               <div className="flex flex-col md:flex-row gap-4 mb-6">
                 <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-medium mb-1">בחירת חודש</label>
-                  <Select 
-                    value={selectedMonth} 
-                    onValueChange={setSelectedMonth}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="בחר חודש" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">כל החודשים</SelectItem>
-                      {availableMonths.map(month => (
-                        <SelectItem key={month} value={month}>{month}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormControl className="mb-3">
+                    <FormLabel>חודש</FormLabel>
+                    <Select 
+                      value={selectedMonth} 
+                      onValueChange={(value) => {
+                        console.log(`Month selection changed to: "${value}"`);
+                        setSelectedMonth(value);
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="בחר חודש">
+                          {selectedMonth === 'all' ? 'כל החודשים' : selectedMonth}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">כל החודשים</SelectItem>
+                        {availableMonths.length > 0 ? (
+                          availableMonths.map((month) => (
+                            <SelectItem key={month} value={month}>
+                              {month}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="none" disabled>
+                            {loading ? 'טוען חודשים...' : 'אין חודשים זמינים'}
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {availableMonths.length === 0 && !loading && (
+                      <Box mt={1}>
+                        <Typography color="error" variant="caption">
+                          לא נמצאו חודשים. יתכן שהתאריכים בדו"ח אינם בפורמט תקין.
+                          <br />
+                          {`מספר דיווחים שנטענו: ${reportData.length}`}
+                        </Typography>
+                      </Box>
+                    )}
+                  </FormControl>
                 </div>
                 <div className="w-full md:w-1/2">
                   <label className="block text-sm font-medium mb-1">חיפוש רפואן</label>
