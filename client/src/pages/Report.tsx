@@ -10,7 +10,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { fetchMonthlyReport, parseDate } from '@/utils/reportUtils';
 import { formatHoursMinutes } from '@/utils/timeUtils';
 import { FormControl, FormLabel } from "@/components/ui/form";
-import { MenuItem } from "@/components/ui/menu";
 import { Box, Typography } from "@/components/ui/ui";
 
 // סוג נתונים עבור משמרת
@@ -407,13 +406,13 @@ const Report = () => {
                       </SelectContent>
                     </Select>
                     {availableMonths.length === 0 && !loading && (
-                      <Box mt={1}>
-                        <Typography color="error" variant="caption">
+                      <div className="mt-1">
+                        <p className="text-sm text-red-500">
                           לא נמצאו חודשים. יתכן שהתאריכים בדו"ח אינם בפורמט תקין.
                           <br />
                           {`מספר דיווחים שנטענו: ${reportData.length}`}
-                        </Typography>
-                      </Box>
+                        </p>
+                      </div>
                     )}
                   </FormControl>
                 </div>
