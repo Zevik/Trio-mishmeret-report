@@ -47,7 +47,7 @@ const Report = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [reportData, setReportData] = useState<ShiftRecord[]>([]);
   const [filteredData, setFilteredData] = useState<ShiftRecord[]>([]);
-  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [availableMonths, setAvailableMonths] = useState<string[]>([]);
   const [summary, setSummary] = useState<{ [medicName: string]: number }>({});
@@ -141,6 +141,8 @@ const Report = () => {
         // If months available, select the latest one
         if (months.length > 0) {
           setSelectedMonth(months[months.length - 1]);
+        } else {
+          setSelectedMonth('all');
         }
         
         setLoading(false);
@@ -158,7 +160,7 @@ const Report = () => {
     let filtered = [...reportData];
     
     // Filter by month
-    if (selectedMonth) {
+    if (selectedMonth && selectedMonth !== 'all') {
       filtered = filtered.filter(shift => {
         const shiftDate = new Date(shift.date);
         const monthYear = shiftDate.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
@@ -177,7 +179,7 @@ const Report = () => {
     setFilteredData(filtered);
     
     // Calculate summary
-    const medicHours = calculateMedicHours(filtered, selectedMonth);
+    const medicHours = calculateMedicHours(filtered, selectedMonth !== 'all' ? selectedMonth : '');
     setSummary(medicHours);
   }, [selectedMonth, searchTerm, reportData]);
 
@@ -203,7 +205,7 @@ const Report = () => {
                       <SelectValue placeholder="בחר חודש" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">כל החודשים</SelectItem>
+                      <SelectItem value="all">כל החודשים</SelectItem>
                       {availableMonths.map(month => (
                         <SelectItem key={month} value={month}>{month}</SelectItem>
                       ))}
