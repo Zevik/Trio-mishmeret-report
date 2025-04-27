@@ -1,0 +1,108 @@
+6:45:03 PM: Failed during stage 'building site': Build script returned non-zero exit code: 2 (https://ntl.fyi/exit-code-2)
+6:44:59 PM: Netlify Build                                                 
+6:44:59 PM: ────────────────────────────────────────────────────────────────
+6:44:59 PM: ​
+6:44:59 PM: ❯ Version
+6:44:59 PM:   @netlify/build 29.59.2
+6:44:59 PM: ​
+6:44:59 PM: ❯ Flags
+6:44:59 PM:   accountId: 6679f5c1d30e70442ec40c28
+6:44:59 PM:   baseRelDir: true
+6:44:59 PM:   buildId: 67c9d0c03908150008cd1a83
+6:44:59 PM:   deployId: 67c9d0c03908150008cd1a85
+6:44:59 PM: ​
+6:44:59 PM: ❯ Current directory
+6:44:59 PM:   /opt/build/repo
+6:44:59 PM: ​
+6:44:59 PM: ❯ Config file
+6:44:59 PM:   /opt/build/repo/netlify.toml
+6:44:59 PM: ​
+6:44:59 PM: ❯ Context
+6:44:59 PM:   production
+6:44:59 PM: ​
+6:44:59 PM: build.command from netlify.toml                               
+6:44:59 PM: ────────────────────────────────────────────────────────────────
+6:44:59 PM: ​
+6:44:59 PM: $ npm install && mkdir -p dist/public && npx vite build
+6:45:00 PM: up to date, audited 523 packages in 878ms
+6:45:00 PM: 67 packages are looking for funding
+6:45:00 PM:   run `npm fund` for details
+6:45:00 PM: 7 moderate severity vulnerabilities
+6:45:00 PM: To address issues that do not require attention, run:
+6:45:00 PM:   npm audit fix
+6:45:00 PM: To address all issues (including breaking changes), run:
+6:45:00 PM:   npm audit fix --force
+6:45:00 PM: Run `npm audit` for details.
+6:45:00 PM: vite v5.4.14 building for production...
+6:45:01 PM: transforming...
+6:45:02 PM: ✓ 1664 modules transformed.
+6:45:02 PM: x Build failed in 1.66s
+6:45:02 PM: error during build:
+6:45:02 PM: [vite:esbuild] Transform failed with 2 errors:
+6:45:02 PM: /opt/build/repo/client/src/utils/environment.ts:52:16: ERROR: Multiple exports with the same name "buildApiPath"
+6:45:02 PM: /opt/build/repo/client/src/utils/environment.ts:52:16: ERROR: The symbol "buildApiPath" has already been declared
+6:45:02 PM: file: /opt/build/repo/client/src/utils/environment.ts:52:16
+6:45:02 PM: 
+6:45:02 PM: Multiple exports with the same name "buildApiPath"
+6:45:02 PM: 50 |   * בסביבה רגילה - משאירה את הנתיבים כמו שהם
+6:45:02 PM: 51 |   */
+6:45:02 PM: 52 |  export function buildApiPath(endpoint: string): string {
+6:45:02 PM:    |                  ^
+6:45:02 PM: 53 |    // בדיקה האם אנחנו בסביבת נטליפיי
+6:45:02 PM: 54 |    const isNetlify = window.location.hostname.includes('netlify.app');
+6:45:02 PM: The symbol "buildApiPath" has already been declared
+6:45:02 PM: 50 |   * בסביבה רגילה - משאירה את הנתיבים כמו שהם
+6:45:02 PM: 51 |   */
+6:45:02 PM: 52 |  export function buildApiPath(endpoint: string): string {
+6:45:02 PM:    |                  ^
+6:45:02 PM: 53 |    // בדיקה האם אנחנו בסביבת נטליפיי
+6:45:02 PM: 54 |    const isNetlify = window.location.hostname.includes('netlify.app');
+6:45:02 PM: 
+6:45:02 PM:     at failureErrorWithLog (/opt/build/repo/node_modules/vite/node_modules/esbuild/lib/main.js:1472:15)
+6:45:02 PM:     at /opt/build/repo/node_modules/vite/node_modules/esbuild/lib/main.js:755:50
+6:45:02 PM:     at responseCallbacks.<computed> (/opt/build/repo/node_modules/vite/node_modules/esbuild/lib/main.js:622:9)
+6:45:02 PM:     at handleIncomingPacket (/opt/build/repo/node_modules/vite/node_modules/esbuild/lib/main.js:677:12)
+6:45:02 PM:     at Socket.readFromStdout (/opt/build/repo/node_modules/vite/node_modules/esbuild/lib/main.js:600:7)
+6:45:02 PM:     at Socket.emit (node:events:518:28)
+6:45:02 PM:     at addChunk (node:internal/streams/readable:561:12)
+6:45:02 PM:     at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+6:45:02 PM:     at Readable.push (node:internal/streams/readable:392:5)
+6:45:02 PM:     at Pipe.onStreamRead (node:internal/stream_base_commons:189:23)
+6:45:02 PM: ​
+6:45:02 PM: "build.command" failed                                        
+6:45:02 PM: ────────────────────────────────────────────────────────────────
+6:45:02 PM: ​
+6:45:02 PM:   Error message
+6:45:02 PM:   Command failed with exit code 1: npm install && mkdir -p dist/public && npx vite build (https://ntl.fyi/exit-code-1)
+6:45:02 PM: ​
+6:45:02 PM:   Error location
+6:45:02 PM:   In build.command from netlify.toml:
+6:45:02 PM:   npm install && mkdir -p dist/public && npx vite build
+6:45:02 PM: ​
+6:45:02 PM:   Resolved config
+6:45:02 PM:   build:
+6:45:02 PM:     command: npm install && mkdir -p dist/public && npx vite build
+6:45:02 PM:     commandOrigin: config
+6:45:02 PM:     publish: /opt/build/repo/dist/public
+6:45:02 PM:     publishOrigin: config
+6:45:02 PM:   functionsDirectory: /opt/build/repo/netlify/functions
+6:45:02 PM:   headers:
+6:45:03 PM:     - for: /*
+      values:
+        Access-Control-Allow-Headers: Origin, X-Requested-With, Content-Type, Accept
+        Access-Control-Allow-Methods: GET, POST, OPTIONS
+        Access-Control-Allow-Origin: '*'
+  headersOrigin: config
+  redirects:
+    - force: true
+      from: /api/*
+      status: 200
+      to: /.netlify/functions/google-sheets/:splat
+    - force: true
+      from: /*
+      status: 200
+      to: /index.html
+  redirectsOrigin: config
+6:45:03 PM: Build failed due to a user error: Build script returned non-zero exit code: 2
+6:45:03 PM: Failing build: Failed to build site
+6:45:03 PM: Finished processing build request in 57.504s

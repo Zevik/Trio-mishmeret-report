@@ -1,0 +1,101 @@
+אחרי בדיקת הפרויקט Trio-mishmeret-form בגיטהאב והשוואתו לפרויקט שיצרנו, אני מזהה מספר הבדלים מרכזיים שעשויים להסביר למה הפרויקט בגיטהאב אינו עובד בנטליפיי בעוד שהפרויקט שלנו כן עובד.
+
+הבעיות העיקריות והפתרונות הנדרשים:
+1. הגדרות נטליפיי
+בעיה: הפרויקט בגיטהאב חסר קובץ הגדרות נטליפיי מתאים.
+
+פתרון: יש להוסיף קובץ netlify.toml בתיקיית השורש עם הגדרות מתאימות:
+
+[build]
+  command = "npm run build"
+  publish = "dist" # או התיקייה שבה נוצר הבילד שלך
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+2. פונקציות שרת בנטליפיי
+בעיה: בפרויקט הגיטהאב אין פונקציות נטליפיי (Netlify Functions) שיטפלו בבקשות API מהצד הקדמי.
+
+פתרון: יש ליצור תיקיית netlify/functions עם פונקציית שרת שתטפל בגישה לגוגל שיטס:
+
+// netlify/functions/google-sheets.js
+exports.handler = async function(event, context) {
+  try {
+    const sheetName = event.path.split('/').pop();
+    const { sheetId } = JSON.parse(event.body || '{}') || { sheetId: '1UxQn7mAinamXXZ6WuK0Zp8aRdfYqXCQ6mf-n4fYVZ8c' };
+    
+    // קוד לגישה לגוגל שיטס כאן...
+    
+    return {
+      statusCode: 200,
+      body: JSON.stringify(result)
+    };
+  } catch (error) {
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: error.message })
+    };
+  }
+};
+3. עדכון הפניות ל-API
+בעיה: הקוד בפרויקט הגיטהאב מתייחס לנתיבי API שאינם עובדים בנטליפיי.
+
+פתרון: יש לעדכן את כל הפניות ל-API כך שיפנו לפונקציות נטליפיי:
+
+// במקום
+fetch('/api/sheets/Medic_card')
+// לשנות ל:
+fetch('/.netlify/functions/google-sheets/Medic_card')
+4. קונפיגורציה של CORS
+בעיה: הגדרות CORS חסרות בפרויקט הגיטהאב.
+
+פתרון: הוספת headers מתאימים בפונקציית נטליפיי:
+
+return {
+  statusCode: 200,
+  headers: {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "GET, POST"
+  },
+  body: JSON.stringify(result)
+};
+5. השוואה מדויקת לפרויקט שלנו
+הנה כמה שינויים ספציפיים שעלינו לבצע על-פי הקוד שעובד אצלנו:
+
+קובץ googleSheetsUtils.ts - לעדכן את הלוגיקה של החילוץ מעמודה F ולוודא שיש 3 דרכים לזיהוי המספר:
+
+// Try to find column F in various formats
+let number = '';
+// Try exact key 'F'
+if (item.F !== undefined) {
+  number = item.F;
+} 
+// Try numeric index for column F (5 in zero-based)
+else if (item['5'] !== undefined) {
+  number = item['5'];
+}
+// Try to find a column that might contain what we want
+else if (keys.length >= 6) {
+  // Get the 6th column value (0-based index 5)
+  const sixthKey = keys[5];
+  number = item[sixthKey];
+}
+הלוגיקה של החיפוש - לוודא שהחיפוש מנקה את הקלט כראוי:
+
+// Clean the input - remove non-digit characters
+const cleanedInput = searchInput.replace(/\D/g, '');
+// Check if the number exists in the list
+const foundItem = medicCardData.find(item => 
+  item.number.replace(/\D/g, '') === cleanedInput
+);
+שינויים מומלצים לביצוע:
+הוספת קובץ netlify.toml לתיקיית השורש
+יצירת תיקיית netlify/functions עם קובץ ל-API
+עדכון הקוד ששואב את הנתונים להשתמש בנתיבי נטליפיי
+עדכון הלוגיקה של חילוץ המספרים מעמודה F
+הוספת משתנה סביבה בנטליפיי עבור מזהה הגיליון

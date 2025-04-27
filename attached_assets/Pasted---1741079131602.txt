@@ -1,0 +1,150 @@
+הלוגיקה הכללית לשילוב גוגל שיטס עם אתר בנטליפיי
+עקרונות בסיסיים
+הגיליון כמסד נתונים:
+
+גיליון גוגל משמש כמסד נתונים פשוט
+כל לשונית (sheet) מייצגת טבלה/קטגוריה נפרדת של מידע
+שרשרת הפעולות:
+
+לקוח → שולח בקשה למידע
+שרת בנטליפיי → מתקשר לגוגל שיטס
+גוגל שיטס → מחזיר מידע
+שרת → מעבד את המידע
+לקוח → מציג את המידע
+פתרון פשוט בשלושה קבצים
+1. פונקציית שרת (עבור נטליפיי)
+// server/functions/server.js (בתיקיית הפונקציות של נטליפיי)
+// פונקציה שמושכת נתונים מגיליון גוגל
+exports.handler = async function(event) {
+  // קבל את שם הגיליון מהנתיב
+  const pathSegments = event.path.split('/');
+  const sheetName = pathSegments[pathSegments.length - 1];
+  
+  // מזהה הגיליון (מתוך ה-URL של הגיליון)
+  const sheetId = "YOUR_SHEET_ID_HERE"; // צריך להחליף זאת עם המזהה שלך
+  
+  try {
+    // URL של ה-API הציבורי של גוגל שיטס
+    const apiUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?sheet=${sheetName}&tqx=out:json`;
+    
+    // בקשה לגוגל שיטס
+    const response = await fetch(apiUrl);
+    const text = await response.text();
+    
+    // הסרת המעטפת מהתגובה
+    const jsonData = text.replace("/*O_o*/\ngoogle.visualization.Query.setResponse(", "").replace(");", "");
+    
+    // החזרת הנתונים כ-JSON
+    return {
+      statusCode: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      },
+      body: jsonData
+    };
+  } catch (error) {
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: error.message })
+    };
+  }
+}
+2. הגדרת הניתוב בנטליפיי
+# netlify.toml
+[build]
+  command = "npm run build"
+  functions = "server/functions"
+  publish = "dist"
+[[redirects]]
+  from = "/api/sheets/*"
+  to = "/.netlify/functions/server"
+  status = 200
+3. פונקציית לקוח (React) לשליפת הנתונים
+// client/src/utils/googleSheets.js
+// פונקציה לשליפת נתונים מהשרת
+export async function fetchSheet(sheetName) {
+  try {
+    // שליחת בקשה לנקודת הקצה של האתר
+    const response = await fetch(`/api/sheets/${sheetName}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch data: ${response.status}`);
+    }
+    
+    // פענוח התגובה
+    const data = await response.json();
+    
+    // אם אין נתונים בגיליון - החזר מערך ריק
+    if (!data.table || !data.table.rows) {
+      return [];
+    }
+    
+    // המרת הנתונים למבנה נוח יותר
+    return data.table.rows.map(row => {
+      const item = {};
+      
+      // לכל עמודה בגיליון
+      data.table.cols.forEach((col, index) => {
+        // קבל את שם העמודה
+        const colName = col.label || col.id;
+        // קבל את הערך מהתא
+        const value = row.c[index] ? row.c[index].v : null;
+        
+        // הוסף למילון
+        item[colName] = value;
+      });
+      
+      return item;
+    });
+  } catch (error) {
+    console.error(`Error fetching ${sheetName}:`, error);
+    return [];
+  }
+}
+// דוגמה לשימוש ב-React Hook
+export function useGoogleSheet(sheetName) {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const result = await fetchSheet(sheetName);
+        setData(result);
+        setError(null);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
+  }, [sheetName]);
+  
+  return { data, loading, error };
+}
+שימוש מעשי בקומפוננטה
+import { useGoogleSheet } from '../utils/googleSheets';
+function ProductList() {
+  const { data, loading, error } = useGoogleSheet('products');
+  
+  if (loading) return <div>טוען מוצרים...</div>;
+  if (error) return <div>שגיאה: {error}</div>;
+  
+  return (
+    <div className="products-grid">
+      {data.map(product => (
+        <div key={product.id} className="product-card">
+          <h3>{product.name}</h3>
+          <img src={product.image} alt={product.name} />
+          <p>{product.description}</p>
+          <strong>מחיר: ₪{product.price}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}

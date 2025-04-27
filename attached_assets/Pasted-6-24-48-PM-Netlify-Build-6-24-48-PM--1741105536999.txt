@@ -1,0 +1,93 @@
+6:24:48 PM: Netlify Build                                                 
+6:24:48 PM: ────────────────────────────────────────────────────────────────
+6:24:48 PM: ​
+6:24:48 PM: ❯ Version
+6:24:48 PM:   @netlify/build 29.59.2
+6:24:48 PM: ​
+6:24:48 PM: ❯ Flags
+6:24:48 PM:   accountId: 6679f5c1d30e70442ec40c28
+6:24:48 PM:   baseRelDir: true
+6:24:48 PM:   buildId: 67c72931c0763f0008325dea
+6:24:48 PM:   deployId: 67c72931c0763f0008325dec
+6:24:48 PM: ​
+6:24:48 PM: ❯ Current directory
+6:24:48 PM:   /opt/build/repo
+6:24:48 PM: ​
+6:24:48 PM: ❯ Config file
+6:24:48 PM:   /opt/build/repo/netlify.toml
+6:24:48 PM: ​
+6:24:48 PM: ❯ Context
+6:24:48 PM:   production
+6:24:48 PM: ​
+6:24:48 PM: build.command from netlify.toml                               
+6:24:48 PM: ────────────────────────────────────────────────────────────────
+6:24:48 PM: ​
+6:24:48 PM: $ npm run build
+6:24:48 PM: > rest-express@1.0.0 build
+6:24:48 PM: > vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist
+6:24:48 PM: vite v5.4.14 building for production...
+6:24:48 PM: transforming...
+6:24:52 PM: ✓ 2561 modules transformed.
+6:24:52 PM: rendering chunks...
+6:24:52 PM: computing gzip size...
+6:24:52 PM: ../dist/public/index.html                   1.80 kB │ gzip:   0.77 kB
+6:24:52 PM: ../dist/public/assets/index-lzvA2the.css   60.55 kB │ gzip:  10.78 kB
+6:24:52 PM: ../dist/public/assets/index-BVsFEbtY.js   515.30 kB │ gzip: 155.79 kB
+6:24:52 PM: 
+6:24:52 PM: (!) Some chunks are larger than 500 kB after minification. Consider:
+6:24:52 PM: - Using dynamic import() to code-split the application
+6:24:52 PM: - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+6:24:52 PM: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+6:24:52 PM: ✓ built in 3.50s
+6:24:52 PM:   dist/index.js  13.2kb
+6:24:52 PM: ⚡ Done in 5ms
+6:24:52 PM: ​
+6:24:52 PM: (build.command completed in 4s)
+6:24:52 PM: ​
+6:24:52 PM: Functions bundling                                            
+6:24:52 PM: ────────────────────────────────────────────────────────────────
+6:24:52 PM: ​
+6:24:52 PM: Packaging Functions from netlify/functions directory:
+6:24:52 PM:  - google-sheets.js
+6:24:52 PM: ​
+6:24:52 PM: ​
+6:24:52 PM: Dependencies installation error                               
+6:24:52 PM: ────────────────────────────────────────────────────────────────
+6:24:52 PM: ​
+6:24:52 PM:   Error message
+6:24:52 PM:   A Netlify Function failed to require one of its dependencies.
+6:24:52 PM:   Please make sure it is present in the site's top-level "package.json".
+​
+6:24:52 PM:   In file "/opt/build/repo/netlify/functions/google-sheets.js"
+6:24:52 PM:   Cannot find module 'google-spreadsheet'
+6:24:52 PM:   Require stack:
+6:24:52 PM:   - /opt/buildhome/node-deps/node_modules/@netlify/zip-it-and-ship-it/dist/runtimes/node/bundlers/zisi/resolve.js
+6:24:52 PM: ​
+6:24:52 PM:   Resolved config
+6:24:52 PM:   build:
+6:24:52 PM:     command: npm run build
+6:24:52 PM:     commandOrigin: config
+6:24:52 PM:     publish: /opt/build/repo/dist
+6:24:52 PM:     publishOrigin: config
+6:24:52 PM:   functionsDirectory: /opt/build/repo/netlify/functions
+6:24:52 PM:   headers:
+6:24:53 PM: Failed during stage 'building site': Build script returned non-zero exit code: 2 (https://ntl.fyi/exit-code-2)
+6:24:53 PM:     - for: /*
+      values:
+        Access-Control-Allow-Headers: Origin, X-Requested-With, Content-Type, Accept
+        Access-Control-Allow-Methods: GET, POST, OPTIONS
+        Access-Control-Allow-Origin: '*'
+  headersOrigin: config
+  redirects:
+    - force: true
+      from: /api/*
+      status: 200
+      to: /.netlify/functions/google-sheets/:splat
+    - force: true
+      from: /*
+      status: 200
+      to: /index.html
+  redirectsOrigin: config
+6:24:53 PM: Build failed due to a user error: Build script returned non-zero exit code: 2
+6:24:53 PM: Failing build: Failed to build site
+6:24:53 PM: Finished processing build request in 23.957s

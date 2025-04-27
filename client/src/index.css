@@ -1,0 +1,171 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+
+    --primary: 210 94% 42%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 0 0% 3.9%;
+    --sidebar-primary: 210 94% 42%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 0 0% 96.1%;
+    --sidebar-accent-foreground: 0 0% 9%;
+    --sidebar-border: 0 0% 89.8%;
+    --sidebar-ring: 0 0% 3.9%;
+
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html, body {
+    direction: rtl;
+    text-align: right;
+  }
+
+  body {
+    @apply font-sans antialiased bg-neutral-50 text-gray-800;
+    font-family: 'Heebo', sans-serif;
+  }
+
+  /* RTL-specific styles */
+  label, h1, h2, h3, h4, h5, h6, p, span, div, button {
+    text-align: right;
+  }
+
+  input, textarea, select {
+    text-align: right;
+  }
+
+  input[type="number"],
+  input[type="tel"] {
+    direction: ltr;
+    text-align: right;
+  }
+
+  input[type="email"],
+  input[type="url"] {
+    direction: ltr;
+  }
+
+  /* Custom utilities for RTL support */
+  .rtl-flip {
+    transform: scaleX(-1);
+  }
+
+  .rtl-reverse {
+    @apply flex-row-reverse;
+  }
+
+  .rtl-margin {
+    @apply mr-0 ml-2 sm:mr-0 sm:ml-4;
+  }
+
+  /* Adjust focus states for better accessibility */
+  .form-input:focus, 
+  .form-select:focus, 
+  .form-checkbox:focus {
+    @apply outline-primary outline-2 outline-offset-2;
+  }
+
+  /* Responsive margin adjustments for RTL */
+  .rtl-ml-auto {
+    margin-right: auto;
+    margin-left: 0;
+  }
+
+  .rtl-mr-auto {
+    margin-left: auto;
+    margin-right: 0;
+  }
+
+  /* Custom colors */
+  .bg-primary {
+    @apply bg-[#0078D4];
+  }
+
+  .bg-primary-light {
+    @apply bg-[#50a0e6];
+  }
+
+  .bg-primary-dark {
+    @apply bg-[#005A9E];
+  }
+
+  .text-primary {
+    @apply text-[#0078D4];
+  }
+
+  .bg-neutral-light {
+    @apply bg-[#F3F2F1];
+  }
+
+  .bg-neutral-medium {
+    @apply bg-[#E1DFDD];
+  }
+  
+  .text-neutral-darkest {
+    @apply text-[#605E5C];
+  }
+
+  .bg-success {
+    @apply bg-[#107C10];
+  }
+
+  .text-success {
+    @apply text-[#107C10];
+  }
+
+  .bg-error {
+    @apply bg-[#A4262C];
+  }
+
+  .text-error {
+    @apply text-[#A4262C];
+  }
+  
+  /* Improved responsive styling */
+  @media (max-width: 640px) {
+    .sm\:flex-col {
+      flex-direction: column;
+    }
+    
+    .sm\:items-start {
+      align-items: flex-start;
+    }
+    
+    .sm\:w-full {
+      width: 100%;
+    }
+  }
+}

@@ -1,0 +1,312 @@
+אשמח שתכתוב קוד ספציפי יותר לתיקון הפרויקט,
+
+46 minutes ago
+ZUNDEFINED
+
+zaviner
+
+AI
+בשמחה! אכתוב לך את הקוד הספציפי שצריך להוסיף או לעדכן בפרויקט Trio-mishmeret-form כדי שיעבוד בנטליפיי. אחלק את זה לקבצים ספציפיים שצריך ליצור או לשנות.
+
+1. קובץ הגדרות נטליפיי
+netlify.toml (ליצור בתיקיית השורש)
+[build]
+  command = "npm run build"
+  publish = "dist"
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+2. פונקציית שרת נטליפיי לגישה לגוגל שיטס
+netlify/functions/google-sheets.js (ליצור תיקייה חדשה וקובץ)
+const fetch = require('node-fetch');
+// פונקציה לחילוץ מזהה הגיליון מה-URL
+function extractSheetId(url) {
+  const regex = /spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
+  const match = url.match(regex);
+  return match ? match[1] : null;
+}
+// פונקציה ראשית שמטפלת בבקשות
+exports.handler = async function(event, context) {
+  // אפשר CORS
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, x-sheet-url',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+      },
+      body: ''
+    };
+  }
+  try {
+    // קבל את שם הגיליון והמזהה
+    const segments = event.path.split('/');
+    const sheetName = segments[segments.length - 1];
+    
+    // אם יש כותרת x-sheet-url, השתמש בה, אחרת השתמש במזהה ברירת המחדל
+    let sheetId = '1UxQn7mAinamXXZ6WuK0Zp8aRdfYqXCQ6mf-n4fYVZ8c'; // מזהה ברירת המחדל
+    const sheetUrl = event.headers['x-sheet-url'];
+    
+    if (sheetUrl) {
+      const extractedId = extractSheetId(sheetUrl);
+      if (extractedId) {
+        sheetId = extractedId;
+      }
+    }
+    console.log(`Fetching from sheet ID: ${sheetId}, sheet name: ${sheetName}`);
+    // בנה את ה-URL לגישה לגיליון
+    const apiUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
+    
+    // שלח בקשה לגיליון
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+      throw new Error(`Google Sheets API responded with status: ${response.status}`);
+    }
+    
+    // קבל את הנתונים כטקסט
+    const text = await response.text();
+    
+    // הסר את הטקסט המיותר מתחילת התגובה
+    const jsonText = text.replace(/^.*?\(/, '').replace(/\);$/, '');
+    
+    // המר לאובייקט JSON
+    const json = JSON.parse(jsonText);
+    
+    // פענח את נתוני הגיליון
+    const headers = json.table.cols.map(col => col.label);
+    const rows = json.table.rows.map(row => {
+      const rowData = {};
+      row.c.forEach((cell, index) => {
+        const value = cell ? (cell.v !== null ? cell.v : '') : '';
+        rowData[headers[index] || index.toString()] = value;
+      });
+      return rowData;
+    });
+    // החזר את הנתונים
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, x-sheet-url',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(rows)
+    };
+  } catch (error) {
+    console.error('Error processing Google Sheets request:', error);
+    
+    return {
+      statusCode: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, x-sheet-url',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ error: error.message })
+    };
+  }
+};
+3. עדכון הקובץ שמטפל בשליפת הנתונים מגוגל שיטס
+src/utils/api.js (או הקובץ המקביל בפרויקט שלך)
+import { queryClient } from '../queryClient'; // התאם את הנתיב בהתאם לפרויקט שלך
+// פונקציה ששולפת נתונים מגיליון גוגל דרך פונקציית נטליפיי
+export const fetchFromGoogleSheets = async (sheetName, customSheetUrl = null) => {
+  try {
+    // בנה את ה-URL לפונקציית נטליפיי
+    const apiUrl = `/.netlify/functions/google-sheets/${sheetName}`;
+    
+    // הגדר כותרות HTTP
+    const headers = {};
+    if (customSheetUrl) {
+      headers['x-sheet-url'] = customSheetUrl;
+    }
+    
+    // שלח בקשה לפונקציית נטליפיי
+    const response = await fetch(apiUrl, { headers });
+    
+    if (!response.ok) {
+      throw new Error(`API responded with status: ${response.status}`);
+    }
+    
+    // קבל את הנתונים כ-JSON
+    return await response.json();
+  } catch (error) {
+    console.error(`Error fetching sheet ${sheetName}:`, error);
+    throw error;
+  }
+};
+// פונקציה ששולפת נתונים מגיליון Medic_card
+export const fetchMedicCard = async (sheetId = '1UxQn7mAinamXXZ6WuK0Zp8aRdfYqXCQ6mf-n4fYVZ8c') => {
+  try {
+    // השתמש בפונקציה הכללית לשליפת נתונים
+    const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
+    const data = await fetchFromGoogleSheets('Medic_card', sheetUrl);
+    
+    console.log('Raw Medic_card data from Google Sheets:', data);
+    
+    // המר את הנתונים למבנה הרצוי
+    return data.map((item, index) => {
+      // קבל את כל המפתחות באובייקט לצורך דיבוג
+      const keys = Object.keys(item);
+      console.log(`Item ${index} keys:`, keys);
+      
+      // נסה למצוא את עמודה F בפורמטים שונים
+      let number = '';
+      
+      // נסה מפתח 'F' מדויק
+      if (item.F !== undefined) {
+        number = item.F;
+      }
+      // נסה אינדקס מספרי לעמודה F (5 באינדוס מבוסס-0)
+      else if (item['5'] !== undefined) {
+        number = item['5'];
+      }
+      // נסה אינדקס 'ת.ז' שהוא השם העברי של העמודה
+      else if (item['ת.ז'] !== undefined) {
+        number = item['ת.ז'];
+      }
+      // נסה למצוא עמודה שאולי מכילה את מה שאנחנו רוצים
+      else if (keys.length >= 6) {
+        // קבל את הערך של העמודה השישית (אינדקס 5 מבוסס-0)
+        const sixthKey = keys[5];
+        number = item[sixthKey];
+      }
+      
+      return {
+        id: String(item.id || index || ''),
+        number: String(number || '')
+      };
+    });
+  } catch (error) {
+    console.error('Error fetching Medic_card data:', error);
+    return [];
+  }
+};
+// פונקציה לשימוש ב-React Query
+export const fetchMedicCardForQuery = () => {
+  return fetchMedicCard('1UxQn7mAinamXXZ6WuK0Zp8aRdfYqXCQ6mf-n4fYVZ8c');
+};
+// פונקציה לרענון הנתונים
+export const refreshData = async () => {
+  queryClient.invalidateQueries({ queryKey: ['medic_card'] });
+};
+4. עדכון קומפוננטת החיפוש
+src/components/IDVerification.js (או הקובץ המקביל בפרויקט שלך)
+import React, { useState } from 'react';
+import { useQuery } from 'react-query'; // או @tanstack/react-query, תלוי בגרסה
+import { fetchMedicCardForQuery } from '../utils/api';
+const IDVerification = () => {
+  const [searchInput, setSearchInput] = useState('');
+  const [searchResult, setSearchResult] = useState(null);
+  
+  // שליפת נתוני תעודות הזהות
+  const { data: medicCardData = [], isLoading, error } = useQuery(
+    ['medic_card'],
+    fetchMedicCardForQuery
+  );
+  
+  // פונקציה שמטפלת בחיפוש
+  const handleSearch = () => {
+    // אל תבצע חיפושים ריקים
+    if (!searchInput.trim()) {
+      setSearchResult(null);
+      return;
+    }
+    
+    // נקה את הקלט - הסר תווים שאינם ספרות
+    const cleanedInput = searchInput.replace(/\D/g, '');
+    
+    // בדוק אם המספר קיים ברשימה
+    const foundItem = medicCardData.find(
+      item => item.number.replace(/\D/g, '') === cleanedInput
+    );
+    
+    if (foundItem) {
+      setSearchResult({
+        found: true,
+        message: `מספר תעודת הזהות ${cleanedInput} נמצא ברשימה!`
+      });
+    } else {
+      setSearchResult({
+        found: false,
+        message: `מספר תעודת הזהות ${cleanedInput} לא נמצא ברשימה.`
+      });
+    }
+  };
+  // טיפול בלחיצה על Enter
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+  if (isLoading) {
+    return <div className="loading">טוען נתונים...</div>;
+  }
+  if (error) {
+    return (
+      <div className="error">
+        <h3>שגיאה בטעינת נתונים</h3>
+        <p>{error.message}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="id-verification">
+      <h2>בדיקת מספר תעודת זהות</h2>
+      
+      <div className="search-container">
+        <input
+          type="text"
+          placeholder="הזן מספר תעודת זהות"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          onKeyPress={handleKeyPress}
+          maxLength={9}
+          className="id-input"
+        />
+        <button onClick={handleSearch} className="search-button">
+          בדוק מספר
+        </button>
+      </div>
+      {searchResult && (
+        <div className={`result ${searchResult.found ? 'success' : 'error'}`}>
+          {searchResult.message}
+        </div>
+      )}
+    </div>
+  );
+};
+export default IDVerification;
+5. עדכון קובץ package.json
+יש להוסיף תלות לפונקציות נטליפיי:
+
+"dependencies": {
+  // תלויות קיימות...
+  "node-fetch": "^2.6.7"
+}
+6. מסמך הוראות התקנה netlify-setup.md
+# הוראות להתקנת הפרויקט בנטליפיי
+1. התקן את ה-Netlify CLI:
+npm install -g netlify-cli
+
+2. חבר את הפרויקט לחשבון נטליפיי:
+netlify login
+netlify init
+
+3. הגדר את המשתנה הסביבתי עבור מזהה גיליון גוגל:
+- עבור לקונסולת הניהול של נטליפיי
+- עבור לפרויקט שלך
+- לחץ על Site Settings -> Build & Deploy -> Environment
+- הוסף משתנה סביבתי חדש:
+  - מפתח: `GOOGLE_SHEET_ID`
+  - ערך: `1UxQn7mAinamXXZ6WuK0Zp8aRdfYqXCQ6mf-n4fYVZ8c`
+4. העלה את הפרויקט לנטליפיי:
+netlify deploy --prod
+
+שינויים אלה צריכים לאפשר לפרויקט שלך לעבוד בנטליפיי. העיקרון המרכזי הוא להעביר את הלוגיקה של שליפת הנתונים מגוגל שיטס לפונקציית שרת של נטליפיי, כך שהבקשה תבוצע מהשרת במקום מהדפדפן. זה פותר בעיות CORS שעלולות להתעורר כאשר מנסים לגשת ישירות לגיליון מהדפדפן.

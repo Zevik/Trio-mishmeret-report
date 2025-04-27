@@ -1,0 +1,32 @@
+[build]
+  command = "npm install && mkdir -p dist/public && npx vite build"
+  publish = "dist/public"
+  functions = "netlify/functions"
+
+# הגדרה אחת בלבד לניתוב API לפונקציית שרת
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/google-sheets/:splat"
+  status = 200
+  force = true
+
+# כל הבקשות האחרות מועברות ל-index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = true
+
+# הגדרת CORS עבור כל הנתיבים
+[[headers]]
+  for = "/*"
+    [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Origin, X-Requested-With, Content-Type, Accept"
+
+# הגדרת MIME type ספציפית לקבצי JavaScript
+[[headers]]
+  for = "*.js"
+    [headers.values]
+    Content-Type = "application/javascript"

@@ -1,0 +1,194 @@
+import { FormData } from "@/context/ShiftFormContext";
+
+// Function to fetch data from Google Sheets through our proxy
+export const fetchFromGoogleSheets = async (sheetId: string, sheetName: string) => {
+  try {
+    // Use our server's proxy endpoint
+    const url = `/api/sheets/${sheetId}?sheet=${encodeURIComponent(sheetName)}`;
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const text = await response.text();
+    
+    // Google Sheets API returns a specific format where the actual JSON is wrapped
+    const jsonText = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*?)\);/)?.[1];
+    
+    if (!jsonText) {
+      throw new Error("Failed to parse Google Sheets response");
+    }
+    
+    const json = JSON.parse(jsonText);
+    
+    // Map the rows to a cleaner format
+    return json.table.rows.map((row: any) => 
+      row.c ? row.c.map((cell: any) => cell?.v || "") : []
+    ) as any[][];
+  } catch (error) {
+    console.error("Error fetching from Google Sheets:", error);
+    throw error;
+  }
+};
+
+// Function to fetch user by ID from sheet
+export const fetchUserByIdFromSheet = async (userId: string): Promise<string | null> => {
+  try {
+    // Use our dedicated API endpoint for user lookup
+    const response = await fetch(`/api/user/${userId}`);
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        // User not found
+        return null;
+      }
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.name || null;
+  } catch (error) {
+    console.error("Error fetching user data:", error);
+    throw error;
+  }
+};
+
+// Function to fetch doctors by shift type
+export const fetchDoctorsByType = async (shiftType: string) => {
+  const SHEET_ID = '1UxQn7mAinamXXZ6WuK0Zp8aRdfYqXCQ6mf-n4fYVZ8c';
+  const SHEET_NAME = 'כרטיס לקוח';
+  
+  try {
+    const rows = await fetchFromGoogleSheets(SHEET_ID, SHEET_NAME);
+    
+    // Filter doctors by type (column A) based on shift type
+    return rows
+      .filter((row: any[]) => {
+        if (shiftType === 'מיזם טריו' && row[0] === 'מיזם טריו') return true;
+        // שינוי: עבור דמו, להציג את הרופאים מ"מיזם טריו"
+        if (shiftType === 'דמו' && (row[0] === 'מיזם טריו')) return true;
+        if (shiftType === 'רפואה שלמה' && row[0] === 'רפואה שלמה') return true;
+        return false;
+      })
+      .map((row: any[]) => row[1]); // Return column B (doctor name)
+  } catch (error) {
+    console.error("Error fetching doctors:", error);
+    return [];
+  }
+};
+
+// Function to submit form data to Google Sheets
+export const submitFormToSheets = async (formData: FormData): Promise<boolean> => {
+  const SHEET_ID = '1UxQn7mAinamXXZ6WuK0Zp8aRdfYqXCQ6mf-n4fYVZ8c';
+  
+  try {
+    // Initialize with empty values for all columns A-T
+    const dataArray = new Array(20).fill("");
+    
+    // שדות בסיסיים (משותפים לכל סוגי המשמרות)
+    // B - שם רפואן
+    dataArray[1] = formData.userName;
+    // C - סוג משמרת
+    dataArray[2] = formData.shiftType;
+    
+    // D, E - תאריך ססיה / שם המדריך
+    if (formData.shiftType === "הכשרה") {
+      dataArray[3] = formData.instructorName;  // D - שם המדריך (רק עבור הכשרה)
+    } else {
+      dataArray[3] = formData.doctorName;      // D - שם הרופא
+    }
+    
+    // E - (חלק מתאריך הססיה)
+    dataArray[4] = ""; // אם יש צורך בפיצול תאריך
+    
+    // F - שעת התחלה
+    dataArray[5] = formData.startTime;
+    // G - שעת סיום
+    dataArray[6] = formData.endTime;
+    // H - משך משמרת מחושב
+    dataArray[7] = formData.calculatedDuration;
+    // I - משך משמרת ידני
+    dataArray[8] = formData.manualDuration;
+    // J - מיקום המשמרת
+    dataArray[9] = formData.location;
+    // K - הערות למשמרת
+    dataArray[10] = formData.shiftNotes;
+    
+    // שדות ייחודיים לפי סוג משמרת
+    switch (formData.shiftType) {
+      case "רפואה שלמה":
+        // L - מספר התיקים שטופלו
+        dataArray[11] = formData.casesHandled.toString();
+        // Q - נשלחו צילומי מסך
+        dataArray[16] = formData.screenshotsSent ? "כן" : "לא";
+        break;
+        
+      case "מיזם טריו":
+        // L - מספר תיקים שטופלו
+        dataArray[11] = formData.trioCasesHandled.toString();
+        // M - מיזם טריו - משימות במערכת מכבי
+        dataArray[12] = formData.macabiTasks.toString();
+        // N - איכות המשמרת
+        dataArray[13] = formData.shiftQuality;
+        break;
+        
+      case "דמו":
+        // L - מספר התיקים שטופלו
+        dataArray[11] = formData.demoCasesHandled.toString();
+        // O - דמו - בהירות התקשורת
+        dataArray[14] = formData.communicationClarity;
+        // P - דמו - נעימות התקשורת
+        dataArray[15] = formData.communicationPleasantness;
+        // Q - נשלחו צילומי מסך
+        dataArray[16] = formData.demoScreenshotsSent ? "כן" : "לא";
+        // R - סדר משמרת
+        dataArray[17] = formData.demoOrder;
+        break;
+        
+      case "הכשרה":
+        // R - סדר משמרת
+        dataArray[17] = formData.trainingOrder;
+        // N - איכות ההדרכה
+        dataArray[13] = formData.trainingQuality;
+        break;
+    }
+    
+    // המר את המערך לאובייקט מיפוי עבור התצוגה
+    const submissionData = {
+      'שם רפואן': dataArray[1],
+      'סוג משמרת': dataArray[2],
+      'שם הרופא/מדריך': dataArray[3],
+      'תאריך ססיה': formData.sessionDate,
+      'שעת התחלה': dataArray[5],
+      'שעת סיום': dataArray[6],
+      'משך משמרת מחושב': dataArray[7],
+      'משך משמרת ידני': dataArray[8],
+      'מיקום המשמרת': dataArray[9],
+      'הערות למשמרת': dataArray[10],
+      'מספר תיקים': dataArray[11],
+      'משימות מכבי': dataArray[12],
+      'איכות': dataArray[13],
+      'בהירות תקשורת': dataArray[14],
+      'נעימות תקשורת': dataArray[15],
+      'צילומי מסך': dataArray[16],
+      'סדר משמרת': dataArray[17]
+    };
+    
+    // For demo purposes, we'll simulate a successful submission
+    // In a real implementation, this would post to a backend API that handles the Google Sheets API
+    
+    return new Promise((resolve) => {
+      // Simulate network delay
+      setTimeout(() => {
+        console.log("Form submitted to Google Sheets:", submissionData);
+        // Resolve with success
+        resolve(true);
+      }, 1500);
+    });
+    
+  } catch (error) {
+    console.error("Error submitting form:", error);
+    throw error;
+  }
+};

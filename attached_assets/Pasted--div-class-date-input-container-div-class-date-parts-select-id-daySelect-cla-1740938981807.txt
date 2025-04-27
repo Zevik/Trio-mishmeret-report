@@ -1,0 +1,85 @@
+<div class="date-input-container">
+    <div class="date-parts">
+        <select id="daySelect" class="date-part-select" required>
+        </select>
+        /
+        <select id="monthSelect" class="date-part-select" required>
+        </select>
+        /
+        <select id="yearSelect" class="date-part-select" required>
+        </select>
+         <span id="displayDate"></span>  </div>
+</div>
+
+<script>
+    function initDatePicker() {
+        const daySelect = document.getElementById('daySelect');
+        const monthSelect = document.getElementById('monthSelect');
+        const yearSelect = document.getElementById('yearSelect');
+        const displayDate = document.getElementById('displayDate'); // אם רוצים להציג תאריך
+
+        function populateDays(selectedMonth, selectedYear) {
+            daySelect.innerHTML = '';
+            let daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate(); // שימו לב לתיקון באינדקס החודש
+            for (let day = 1; day <= daysInMonth; day++) {
+                let option = document.createElement('option');
+                option.value = day;
+                option.text = day;
+                daySelect.appendChild(option);
+            }
+        }
+
+        function populateMonths() {
+            monthSelect.innerHTML = '';
+            for (let month = 1; month <= 12; month++) { // חודשים מ-1 עד 12
+                let option = document.createElement('option');
+                option.value = month;
+                option.text = month; // הצגת מספר החודש
+                monthSelect.appendChild(option);
+            }
+        }
+
+        function populateYears() {
+            yearSelect.innerHTML = '';
+            let currentYear = new Date().getFullYear();
+            for (let year = currentYear - 10; year <= currentYear + 10; year++) {
+                let option = document.createElement('option');
+                option.value = year;
+                option.text = year;
+                yearSelect.appendChild(option);
+            }
+            yearSelect.value = currentYear;
+        }
+
+        function updateDisplayDate() { // אם רוצים להציג תאריך
+            const day = daySelect.value;
+            const month = monthSelect.value;
+            const year = yearSelect.value;
+            displayDate.textContent = `${day}/${month}/${year}`; // פורמט dd/mm/YYYY
+        }
+
+
+        populateMonths();
+        populateYears();
+        populateDays(new Date().getMonth() + 1, new Date().getFullYear()); // אתחול ימים - שימו לב לתיקון באינדקס החודש
+        updateDisplayDate(); // הצגה ראשונית של התאריך - אם רוצים להציג תאריך
+
+
+        monthSelect.addEventListener('change', function() {
+            populateDays(parseInt(monthSelect.value), parseInt(yearSelect.value));
+            updateDisplayDate(); // עדכון תצוגה בשינוי חודש - אם רוצים להציג תאריך
+        });
+
+        yearSelect.addEventListener('change', function() {
+            populateDays(parseInt(monthSelect.value), parseInt(yearSelect.value));
+            updateDisplayDate(); // עדכון תצוגה בשינוי שנה - אם רוצים להציג תאריך
+        });
+
+        daySelect.addEventListener('change', updateDisplayDate); // עדכון תצוגה בשינוי יום - אם רוצים להציג תאריך
+    }
+
+
+    document.addEventListener('DOMContentLoaded', function() {
+        initDatePicker();
+    });
+</script>
