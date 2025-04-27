@@ -399,7 +399,7 @@ const Report = () => {
                             </SelectItem>
                           ))
                         ) : (
-                          <SelectItem value="none" disabled>
+                          <SelectItem value="no-months" disabled>
                             {loading ? 'טוען חודשים...' : 'אין חודשים זמינים'}
                           </SelectItem>
                         )}
