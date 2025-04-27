@@ -9,7 +9,6 @@ import { buildGASUrl } from '../utils/environment';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchMonthlyReport, parseDate } from '@/utils/reportUtils';
 import { formatHoursMinutes } from '@/utils/timeUtils';
-import { FormControl, FormLabel } from "@/components/ui/form";
 import { Box, Typography } from "@/components/ui/ui";
 
 // סוג נתונים עבור משמרת
@@ -376,8 +375,8 @@ const Report = () => {
             <>
               <div className="flex flex-col md:flex-row gap-4 mb-6">
                 <div className="w-full md:w-1/2">
-                  <FormControl className="mb-3">
-                    <FormLabel>חודש</FormLabel>
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium mb-1">חודש</label>
                     <Select 
                       value={selectedMonth} 
                       onValueChange={(value) => {
@@ -414,7 +413,7 @@ const Report = () => {
                         </p>
                       </div>
                     )}
-                  </FormControl>
+                  </div>
                 </div>
                 <div className="w-full md:w-1/2">
                   <label className="block text-sm font-medium mb-1">חיפוש רפואן</label>
