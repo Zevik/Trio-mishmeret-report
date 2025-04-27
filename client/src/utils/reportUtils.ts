@@ -102,4 +102,42 @@ export const extractMonthYearHebrew = (dateStr: string): string => {
     console.error('Error extracting month/year:', error);
     return '';
   }
+};
+
+/**
+ * פרסור תאריך מפורמט DD/MM/YYYY או DD/MM/YYYY HH:mm:ss
+ * מחזיר אובייקט Date
+ */
+export const parseDate = (dateStr: string): Date | null => {
+  if (!dateStr) return null;
+  
+  try {
+    // ניקוי התאריך מרווחים מיותרים
+    const cleanedDateStr = dateStr.trim();
+    
+    // פרסור תאריך בפורמט DD/MM/YYYY
+    if (cleanedDateStr.includes('/')) {
+      const dateParts = cleanedDateStr.split(' ')[0].split('/');
+      if (dateParts.length === 3) {
+        const day = parseInt(dateParts[0], 10);
+        const month = parseInt(dateParts[1], 10) - 1; // חודשים בJS מתחילים מ-0
+        const year = parseInt(dateParts[2], 10);
+        
+        if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+          return new Date(year, month, day);
+        }
+      }
+    }
+    
+    // ניסיון פרסור רגיל של JS
+    const date = new Date(dateStr);
+    if (!isNaN(date.getTime())) {
+      return date;
+    }
+    
+    return null;
+  } catch (e) {
+    console.error('Error parsing date:', dateStr, e);
+    return null;
+  }
 }; 

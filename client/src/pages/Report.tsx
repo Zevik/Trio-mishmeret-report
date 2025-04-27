@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { buildGASUrl } from '../utils/environment';
 import { Skeleton } from '@/components/ui/skeleton';
-import { fetchMonthlyReport } from '@/utils/reportUtils';
+import { fetchMonthlyReport, parseDate } from '@/utils/reportUtils';
 import { formatHoursMinutes } from '@/utils/timeUtils';
 
 // סוג נתונים עבור משמרת
@@ -58,8 +58,13 @@ const Report = () => {
     // Filter by selected month if any
     const filtered = month ? 
       shifts.filter(shift => {
-        const shiftDate = new Date(shift.date);
-        const shiftMonth = shiftDate.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
+        const parsedDate = parseDate(shift.date);
+        if (!parsedDate) return false;
+        
+        const shiftMonth = parsedDate.toLocaleDateString('he-IL', { 
+          month: 'long', 
+          year: 'numeric' 
+        });
         return shiftMonth === month;
       }) : shifts;
     
@@ -88,9 +93,18 @@ const Report = () => {
     const months = new Set<string>();
     
     shifts.forEach(shift => {
-      const shiftDate = new Date(shift.date);
-      const monthYear = shiftDate.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
-      months.add(monthYear);
+      // שימוש בפונקציית parseDate לחילוץ תאריך
+      const parsedDate = parseDate(shift.date);
+      if (parsedDate) {
+        const monthYear = parsedDate.toLocaleDateString('he-IL', {
+          month: 'long',
+          year: 'numeric'
+        });
+        months.add(monthYear);
+        console.log(`Extracted month: ${monthYear} from date: ${shift.date}`);
+      } else {
+        console.warn(`Failed to parse date: ${shift.date}`);
+      }
     });
     
     return Array.from(months).sort((a, b) => {
@@ -162,8 +176,13 @@ const Report = () => {
     // Filter by month
     if (selectedMonth && selectedMonth !== 'all') {
       filtered = filtered.filter(shift => {
-        const shiftDate = new Date(shift.date);
-        const monthYear = shiftDate.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
+        const parsedDate = parseDate(shift.date);
+        if (!parsedDate) return false;
+        
+        const monthYear = parsedDate.toLocaleDateString('he-IL', {
+          month: 'long',
+          year: 'numeric'
+        });
         return monthYear === selectedMonth;
       });
     }
@@ -275,7 +294,9 @@ const Report = () => {
                       filteredData.map((shift) => (
                         <TableRow key={shift.id}>
                           <TableCell className="font-medium">{shift.medicName}</TableCell>
-                          <TableCell>{new Date(shift.date).toLocaleDateString('he-IL')}</TableCell>
+                          <TableCell>
+                            {parseDate(shift.date)?.toLocaleDateString('he-IL') || shift.date}
+                          </TableCell>
                           <TableCell>{shift.startTime}</TableCell>
                           <TableCell>{shift.endTime}</TableCell>
                           <TableCell>
