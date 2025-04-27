@@ -454,46 +454,6 @@ const Report = () => {
                   </TableBody>
                 </Table>
               </div>
-              
-              <h3 className="text-lg font-bold mb-4">פירוט משמרות</h3>
-              <div className="rounded-md border overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-right">שם רפואן</TableHead>
-                      <TableHead className="text-right">תאריך</TableHead>
-                      <TableHead className="text-right">שעת התחלה</TableHead>
-                      <TableHead className="text-right">שעת סיום</TableHead>
-                      <TableHead className="text-right">משך משמרת</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredData.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center py-4">
-                          לא נמצאו משמרות
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredData.map((shift) => (
-                        <TableRow key={shift.id}>
-                          <TableCell className="font-medium">{shift.medicName}</TableCell>
-                          <TableCell>
-                            {parseDate(shift.date)?.toLocaleDateString('he-IL') || shift.date}
-                          </TableCell>
-                          <TableCell>{shift.startTime}</TableCell>
-                          <TableCell>{shift.endTime}</TableCell>
-                          <TableCell>
-                            {shift.reportedHours && shift.reportedHours !== shift.totalHours 
-                              ? `${shift.reportedHours} (דווח) / ${shift.totalHours} (מחושב)` 
-                              : shift.totalHours}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
             </>
           )}
         </CardContent>
