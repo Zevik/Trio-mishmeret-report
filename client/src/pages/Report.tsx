@@ -523,7 +523,10 @@ const Report = () => {
                         .map(([medicName, minutes]) => (
                           <TableRow key={medicName}>
                             <TableCell className="font-medium">{medicName}</TableCell>
-                            <TableCell className="text-center">{formatHoursMinutes(minutes)}</TableCell>
+                            <TableCell className="text-center">
+                              {formatHoursMinutes(minutes)}
+                              {minutes > 10000 && <div className="text-xs text-red-500">{minutes} דקות</div>}
+                            </TableCell>
                           </TableRow>
                         ))
                     )}

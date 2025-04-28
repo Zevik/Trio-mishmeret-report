@@ -64,14 +64,33 @@ export const timeToMinutes = (timeStr: string): number => {
 
 /**
  * מעצב דקות לפורמט של שעות:דקות
+ * מתקן גם מקרים של מספרים גדולים
  */
 export const formatHoursMinutes = (minutes: number): string => {
   if (minutes < 0) {
     return '0:00';
   }
   
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
+  // בדיקה האם מדובר במחרוזת מוכנה של HH:MM
+  if (typeof minutes === 'string' && minutes.includes(':')) {
+    console.log(`formatHoursMinutes: received already formatted string: ${minutes}`);
+    return minutes;
+  }
+  
+  // המרה למספר דקות
+  const totalMinutes = Number(minutes);
+  if (isNaN(totalMinutes)) {
+    console.error(`formatHoursMinutes: Invalid input: ${minutes}`);
+    return '0:00';
+  }
+  
+  console.log(`formatHoursMinutes: formatting ${totalMinutes} minutes`);
+  
+  // חישוב שעות ודקות מסך הכל דקות
+  const hours = Math.floor(totalMinutes / 60);
+  const remainingMinutes = Math.floor(totalMinutes % 60);
+  
+  // פורמט עם אפסים מובילים לדקות
   return `${hours}:${remainingMinutes.toString().padStart(2, '0')}`;
 };
 
