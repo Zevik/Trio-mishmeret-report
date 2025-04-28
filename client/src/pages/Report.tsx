@@ -7,8 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { buildGASUrl } from '../utils/environment';
 import { Skeleton } from '@/components/ui/skeleton';
-import { fetchMonthlyReport, parseDate } from '@/utils/reportUtils';
-import { formatHoursMinutes } from '@/utils/timeUtils';
+import { fetchMonthlyReport } from '@/utils/reportUtils';
+import { formatHoursMinutes, parseTimeToMinutes, sumTimeStrings, parseDate } from '@/utils/timeUtils';
 import { Box, Typography } from "@/components/ui/ui";
 
 // סוג נתונים עבור משמרת
@@ -27,14 +27,14 @@ interface DoctorSummary {
 
 type ShiftRecord = {
   id: string;
-  date: string;
-  medicName: string; // רפואן
+  date: string;         // תאריך המשמרת - string in DD.MM.YYYY or DD/MM/YYYY format
+  medicName: string;    // רפואן
   shiftType: string;
   doctorName: string;
-  startTime: string;
-  endTime: string;
-  totalHours: string;
-  reportedHours: string | null;
+  startTime: string;    // שעת התחלה - HH:MM format
+  endTime: string;      // שעת סיום - HH:MM format
+  totalHours: string;   // שעות מחושבות - HH:MM or decimal format
+  reportedHours: string | null; // שעות שדווחו ידנית - HH:MM or decimal format
 };
 
 type MonthlyReportData = {
@@ -56,11 +56,11 @@ const Report = () => {
   const calculateMedicHours = (shifts: ShiftRecord[], month: string) => {
     console.log("=========== DEBUG: Starting calculateMedicHours ===========");
     
-    // לוגיקה חדשה לחישוב שעות לפי רפואן
+    // Initialize data structures
     const medicHoursRaw: { [medicName: string]: string[] } = {};
     const medicHours: { [medicName: string]: number } = {};
     
-    // המידע יוצג במשתנה גלובלי לצורך דיבאג
+    // For debugging
     // @ts-ignore
     window.debugShiftData = {
       shifts: [...shifts],
@@ -69,46 +69,21 @@ const Report = () => {
       medicHoursRaw: {}
     };
     
-    // Filter by selected month if any
+    // Filter by selected month
     const filtered = month ? 
       shifts.filter(shift => {
-        // חילוץ תאריך המשמרת מהמחרוזת
-        let shiftDate: Date | null = null;
-        
         try {
-          // בדוק אם מדובר בתאריך ISO
-          if (shift.date && shift.date.includes('T')) {
-            shiftDate = new Date(shift.date);
-            console.log(`Filtering date (ISO): ${shift.date} => ${shiftDate.toISOString()}`);
-          } 
-          // אחרת נסה לפרסר כ-DD/MM/YYYY
-          else if (shift.date && shift.date.includes('/')) {
-            const parts = shift.date.split('/');
-            if (parts.length === 3) {
-              const day = parseInt(parts[0], 10);
-              const month = parseInt(parts[1], 10) - 1; // חודשים מתחילים מ-0
-              const year = parseInt(parts[2], 10);
-              shiftDate = new Date(year, month, day);
-              console.log(`Filtering date (DD/MM/YYYY): ${shift.date} => ${shiftDate.toISOString()}`);
-            }
-          }
+          // Parse the date using parseDate from timeUtils
+          const parsedDate = parseDate(shift.date);
           
-          // אם לא הצלחנו לפרסר, נסה לפרסר עם parseDate
-          if (!shiftDate || isNaN(shiftDate.getTime())) {
-            shiftDate = parseDate(shift.date);
-            if (shiftDate) {
-              console.log(`Filtering date (parseDate): ${shift.date} => ${shiftDate.toISOString()}`);
-            }
-          }
-          
-          // בדוק אם הצלחנו לפרסר את התאריך
-          if (!shiftDate || isNaN(shiftDate.getTime())) {
+          // Check if we were able to parse the date
+          if (!parsedDate) {
             console.warn(`Invalid date format for filtering: ${shift.date}`);
             return false;
           }
           
-          // בדוק האם התאריך מתאים לחודש הנבחר
-          const shiftMonthYear = shiftDate.toLocaleDateString('he-IL', { 
+          // Get formatted month and year for comparison
+          const shiftMonthYear = parsedDate.toLocaleDateString('he-IL', { 
             month: 'long', 
             year: 'numeric' 
           });
@@ -123,31 +98,31 @@ const Report = () => {
         }
       }) : shifts;
       
-      // הוסף לוג של מספר המשמרות אחרי הסינון
-      console.log(`Filtered shifts: ${filtered.length} out of ${shifts.length} total shifts`);
-      
-      // הוסף לוג של כמה משמרות יש לכל רפואן אחרי הסינון
-      const countByMedic = filtered.reduce((acc, shift) => {
-        acc[shift.medicName] = (acc[shift.medicName] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
-      
-      console.log("Shifts per medic after filtering:", countByMedic);
-      
-    // אסוף את כל השעות לפי רפואן בפורמט המקורי
+    // Log filtered shift count
+    console.log(`Filtered shifts: ${filtered.length} out of ${shifts.length} total shifts`);
+    
+    // Count shifts per medic after filtering
+    const countByMedic = filtered.reduce((acc, shift) => {
+      acc[shift.medicName] = (acc[shift.medicName] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    console.log("Shifts per medic after filtering:", countByMedic);
+    
+    // Collect all hours by medic in raw format
     filtered.forEach(shift => {
       const medicName = shift.medicName;
-      // בחר משך זמן מדווח אם קיים, אחרת משך זמן מחושב
+      // Use reported hours if available, otherwise calculated hours
       const hoursStr = shift.reportedHours && shift.reportedHours !== shift.totalHours 
         ? shift.reportedHours 
         : shift.totalHours;
       
-      // אתחל מערך לרפואן אם לא קיים
+      // Initialize array for medic if not exists
       if (!medicHoursRaw[medicName]) {
         medicHoursRaw[medicName] = [];
       }
       
-      // הוסף את השעות למערך של הרפואן
+      // Add hours to medic's array
       if (hoursStr) {
         medicHoursRaw[medicName].push(hoursStr);
         console.log(`Adding shift for ${medicName}: ${hoursStr}`);
@@ -156,83 +131,22 @@ const Report = () => {
       }
     });
     
+    // Store raw hours for debugging
     // @ts-ignore
     window.debugShiftData.medicHoursRaw = {...medicHoursRaw};
     
-    // חשב את סך הדקות לפי רפואן
+    // Calculate total minutes per medic using our time utility functions
     Object.entries(medicHoursRaw).forEach(([medicName, hoursList]) => {
-      let totalMinutes = 0;
+      // Use sumTimeStrings to get accurate total minutes
+      const totalMinutes = sumTimeStrings(hoursList);
       
-      console.log(`Calculating total for ${medicName} (${hoursList.length} shifts):`);
-      
-      hoursList.forEach(hoursStr => {
-        try {
-          let hours = 0;
-          let minutes = 0;
-          
-          // בדוק אם זה פורמט של תאריך מלא (עם השנה 1899)
-          if (hoursStr.includes('1899') || hoursStr.startsWith('18')) {
-            // התמודדות עם פורמט הזמן של גוגל שיטס עם השנה 1899
-            try {
-              const date = new Date(hoursStr);
-              
-              if (!isNaN(date.getTime())) {
-                // הוצא את משך הזמן מהשעה בתאריך המקורי
-                // תאריכי 1899 בגוגל שיטס מייצגים משך זמן בשעות ודקות בלבד
-                hours = date.getUTCHours(); // אנחנו רוצים את השעות ב-UTC
-                minutes = date.getUTCMinutes();
-                
-                // החישוב עכשיו נכון יותר, כי אנחנו מתייחסים לשעון UTC
-                // ולא מושפעים מאזור הזמן המקומי או שעון קיץ
-                
-                console.log(`  ${hoursStr} => Parsing as Google date (UTC) => ${hours}h ${minutes}m`);
-              } else {
-                console.warn(`  Failed to parse Google date format: ${hoursStr}`);
-                return; // דלג על רשומה זו
-              }
-            } catch (err) {
-              console.error(`  Error parsing Google date: ${hoursStr}`, err);
-              return; // דלג על רשומה זו
-            }
-          } 
-          // בדוק אם זה פורמט של "HH:MM"
-          else if (hoursStr.includes(':')) {
-            // המר את מחרוזת השעות לדקות
-            const timeParts = hoursStr.trim().split(':');
-            hours = parseInt(timeParts[0], 10);
-            minutes = parseInt(timeParts[1], 10);
-            console.log(`  ${hoursStr} => Parsing as HH:MM => ${hours}h ${minutes}m`);
-          }
-          // אחרת, נסה לפרש כמספר
-          else {
-            const num = parseFloat(hoursStr);
-            if (!isNaN(num)) {
-              hours = Math.floor(num);
-              minutes = Math.round((num - hours) * 60);
-              console.log(`  ${hoursStr} => Parsing as decimal hours => ${hours}h ${minutes}m`);
-            } else {
-              console.warn(`  Failed to parse as number: ${hoursStr}`);
-              return; // דלג על רשומה זו
-            }
-          }
-          
-          if (!isNaN(hours) && !isNaN(minutes)) {
-            const shiftMinutes = (hours * 60) + minutes;
-            totalMinutes += shiftMinutes;
-            console.log(`  → ${hours}h ${minutes}m (${shiftMinutes} minutes) => running total: ${totalMinutes} minutes`);
-          } else {
-            console.warn(`  Invalid parsed time: hours=${hours}, minutes=${minutes}`);
-          }
-        } catch (err) {
-          console.error(`  Error processing time ${hoursStr}:`, err);
-        }
-      });
-      
-      // שמור את סך הדקות
+      // Store total minutes
       medicHours[medicName] = totalMinutes;
+      
+      // Log final total
       console.log(`Final total for ${medicName}: ${totalMinutes} minutes (${formatHoursMinutes(totalMinutes)})`);
       
-      // שמור לדיבאג
+      // Store for debugging
       // @ts-ignore
       window.debugShiftData.calculations.push({
         medicName,
@@ -242,6 +156,7 @@ const Report = () => {
       });
     });
     
+    // Store final results for debugging
     // @ts-ignore
     window.debugShiftData.medicHours = {...medicHours};
     console.log('Final medicHours:', medicHours);
@@ -271,8 +186,8 @@ const Report = () => {
         
         try {
           const dateStr = item.date;
-          console.log(`extractMonths: processing date "${dateStr}" from item ${index}`);
           
+          // Use our parseDate function from timeUtils
           const parsedDate = parseDate(dateStr);
           if (!parsedDate) {
             console.warn(`extractMonths: could not parse date "${dateStr}" from item ${index}`);
@@ -280,8 +195,6 @@ const Report = () => {
           }
           
           const monthFormat = parsedDate.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
-          console.log(`extractMonths: extracted month format: "${monthFormat}" from date ${dateStr}`);
-          
           months.add(monthFormat);
         } catch (e) {
           console.error(`extractMonths: Error processing item at index ${index}:`, e);
@@ -290,12 +203,9 @@ const Report = () => {
       
       // המרה למערך וסידור
       const uniqueMonths = Array.from(months);
-      console.log('extractMonths: pre-sort months:', uniqueMonths);
       
       try {
         uniqueMonths.sort((a, b) => {
-          console.log(`Comparing: "${a}" vs "${b}"`);
-          
           // חילוץ שנה וחודש
           const aParts = a.split(' ');
           const bParts = b.split(' ');
@@ -310,8 +220,6 @@ const Report = () => {
           const bMonth = bParts[0];
           const bYear = parseInt(bParts[1], 10);
           
-          console.log(`a: month=${aMonth}, year=${aYear}, b: month=${bMonth}, year=${bYear}`);
-          
           // השוואה לפי שנים
           if (aYear !== bYear) {
             return bYear - aYear; // סדר יורד - חדש לישן
@@ -320,8 +228,6 @@ const Report = () => {
           // אם השנים שוות, השוואה לפי חודש
           const aMonthIndex = getMonthIndex(aMonth);
           const bMonthIndex = getMonthIndex(bMonth);
-          
-          console.log(`Month indices: a=${aMonthIndex}, b=${bMonthIndex}`);
           
           return bMonthIndex - aMonthIndex; // סדר יורד - חדש לישן
         });
@@ -479,8 +385,8 @@ const Report = () => {
       filtered = filtered.filter(shift => {
         try {
           const dateStr = shift.date;
-          console.log(`Evaluating date: "${dateStr}" for filter: "${selectedMonth}"`);
           
+          // Attempt to parse date with our parseDate function from timeUtils
           const parsedDate = parseDate(dateStr);
           if (!parsedDate) {
             console.warn(`Could not parse date: "${dateStr}" - excluding from filter`);
@@ -493,7 +399,9 @@ const Report = () => {
           });
           
           const matches = monthYear === selectedMonth;
-          console.log(`Date "${dateStr}" parsed to month-year: "${monthYear}" - matches filter: ${matches}`);
+          if (matches) {
+            console.log(`Date "${dateStr}" matches filter: "${selectedMonth}"`);
+          }
           
           return matches;
         } catch (e) {

@@ -81,7 +81,10 @@ export default function ShiftDetails({ onSubmit }: ShiftDetailsProps) {
   useEffect(() => {
     if (formData.startTime && formData.endTime) {
       try {
+        // Use our improved calculateDuration function
         const duration = calculateDuration(formData.startTime, formData.endTime);
+        
+        // Update the form data with the calculated duration
         setFormData({ calculatedDuration: duration });
         
         // Update form's calculated duration field

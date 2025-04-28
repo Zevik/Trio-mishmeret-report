@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useShifts } from '../contexts/ShiftContext';
+import { useShifts } from '../contexts/ShiftsContext';
 import { formatHoursMinutes, calculateTimeDifference, parseDate } from '../utils/timeUtils';
-import { Shift } from '../types/shift';
+import { Shift } from '../types';
 import { useToast } from '../contexts/ToastContext';
 import { useTranslation } from 'react-i18next';
 import { Card, CardContent } from "@/components/ui/card";
@@ -111,15 +111,33 @@ const ShiftForm: React.FC<ShiftFormProps> = ({ shift, onClose }) => {
       const newData = { ...prev, [field]: value };
       
       if (newData.startTime && newData.endTime && newData.date) {
-        const start = new Date(`${newData.date}T${newData.startTime}`);
-        const end = new Date(`${newData.date}T${newData.endTime}`);
-        
-        if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end > start) {
-          const minutes = calculateTimeDifference(
-            start.toISOString(),
-            end.toISOString()
-          );
-          newData.totalHours = minutes;
+        try {
+          // Create full ISO date strings by combining date and time
+          const dateObj = parseDate(newData.date);
+          
+          if (dateObj) {
+            const dateStr = dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
+            const startDateTime = `${dateStr}T${newData.startTime}:00.000Z`;
+            const endDateTime = `${dateStr}T${newData.endTime}:00.000Z`;
+            
+            // Calculate time difference in minutes
+            const minutes = calculateTimeDifference(startDateTime, endDateTime);
+            
+            // Handle overnight shifts (when end time is earlier than start time)
+            if (minutes < 0) {
+              // For overnight shifts, calculate as if end time is on the next day
+              const nextDate = new Date(dateObj);
+              nextDate.setDate(nextDate.getDate() + 1);
+              const nextDateStr = nextDate.toISOString().split('T')[0];
+              const endDateTimeNextDay = `${nextDateStr}T${newData.endTime}:00.000Z`;
+              
+              newData.totalHours = calculateTimeDifference(startDateTime, endDateTimeNextDay);
+            } else {
+              newData.totalHours = minutes;
+            }
+          }
+        } catch (error) {
+          console.error('Error calculating shift duration:', error);
         }
       }
       
