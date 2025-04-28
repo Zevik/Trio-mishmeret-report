@@ -77,6 +77,8 @@ const Report = () => {
         return shiftMonth === month;
       }) : shifts;
     
+    console.log('Filtered shifts for calculation:', filtered.length);
+    
     // Calculate hours for each medic
     filtered.forEach(shift => {
       const medicName = shift.medicName;
@@ -84,10 +86,58 @@ const Report = () => {
         ? shift.reportedHours 
         : shift.totalHours;
       
-      // Convert HH:MM to minutes
-      const [hours, minutes] = hoursStr.split(':').map(num => parseInt(num, 10));
+      // בדוק האם מחרוזת השעות בפורמט תקין
+      if (!hoursStr || typeof hoursStr !== 'string') {
+        console.warn(`Invalid hours format for ${medicName}:`, hoursStr);
+        // @ts-ignore
+        window.debugShiftData.calculations.push({
+          medicName,
+          hoursStr,
+          error: 'Invalid format',
+          shift
+        });
+        return; // דלג על רשומה זו
+      }
+      
+      // Extract hours and minutes from the format "HH:MM"
+      const timeParts = hoursStr.trim().split(':');
+      
+      // ודא שיש לנו לפחות שעות ודקות
+      if (timeParts.length < 2) {
+        console.warn(`Invalid time format for ${medicName}:`, hoursStr);
+        // @ts-ignore
+        window.debugShiftData.calculations.push({
+          medicName,
+          hoursStr,
+          error: 'Missing hours or minutes',
+          shift
+        });
+        return; // דלג על רשומה זו
+      }
+      
+      // המר את השעות והדקות למספרים
+      const hours = parseInt(timeParts[0], 10);
+      const minutes = parseInt(timeParts[1], 10);
+      
+      // בדוק שההמרה תקינה
+      if (isNaN(hours) || isNaN(minutes)) {
+        console.warn(`Invalid numeric value in time for ${medicName}:`, hoursStr, hours, minutes);
+        // @ts-ignore
+        window.debugShiftData.calculations.push({
+          medicName,
+          hoursStr,
+          error: 'NaN in hours or minutes',
+          hours,
+          minutes,
+          shift
+        });
+        return; // דלג על רשומה זו
+      }
+      
+      // חשב את סך הדקות
       const totalMinutes = (hours * 60) + minutes;
       
+      // הוסף למונה של הרפואן
       if (!medicHours[medicName]) {
         medicHours[medicName] = 0;
       }
@@ -102,7 +152,8 @@ const Report = () => {
         hours,
         minutes,
         totalMinutes,
-        runningTotal: medicHours[medicName]
+        runningTotal: medicHours[medicName],
+        shift
       });
       
       console.log(`Adding shift for ${medicName}: hoursStr=${hoursStr}, hours=${hours}, minutes=${minutes}, totalMinutes=${totalMinutes}, runningTotal=${medicHours[medicName]}`);
