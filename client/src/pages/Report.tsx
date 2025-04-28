@@ -55,6 +55,7 @@ const Report = () => {
 
   const calculateMedicHours = (shifts: ShiftRecord[], month: string) => {
     console.log("=========== DEBUG: Starting calculateMedicHours ===========");
+    console.log(`calculateMedicHours: Month parameter: "${month}"`);
     
     // Initialize data structures
     const medicHoursRaw: { [medicName: string]: string[] } = {};
@@ -73,6 +74,8 @@ const Report = () => {
     const filtered = month ? 
       shifts.filter(shift => {
         try {
+          console.log(`calculateMedicHours: Checking shift date: "${shift.date}" for ${shift.medicName}`);
+          
           // Parse the date using parseDate from timeUtils
           const parsedDate = parseDate(shift.date);
           
@@ -82,6 +85,9 @@ const Report = () => {
             return false;
           }
           
+          // Format for debugging
+          console.log(`calculateMedicHours: Parsed date: ${parsedDate.toISOString()}`);
+          
           // Get formatted month and year for comparison
           const shiftMonthYear = parsedDate.toLocaleDateString('he-IL', { 
             month: 'long', 
@@ -89,7 +95,7 @@ const Report = () => {
           });
           
           const matches = shiftMonthYear === month;
-          console.log(`Filtering shift for ${shift.medicName}: ${shift.date} => ${shiftMonthYear} - matches "${month}": ${matches}`);
+          console.log(`calculateMedicHours: Filtering shift for ${shift.medicName}: ${shift.date} => ${shiftMonthYear} - matches "${month}": ${matches}`);
           
           return matches;
         } catch (err) {
@@ -99,7 +105,14 @@ const Report = () => {
       }) : shifts;
       
     // Log filtered shift count
-    console.log(`Filtered shifts: ${filtered.length} out of ${shifts.length} total shifts`);
+    console.log(`calculateMedicHours: Filtered shifts: ${filtered.length} out of ${shifts.length} total shifts`);
+    
+    if (filtered.length > 0) {
+      console.log("calculateMedicHours: Sample filtered shifts:");
+      filtered.slice(0, 3).forEach((shift, i) => {
+        console.log(`  [${i}] ${shift.medicName}, ${shift.date}, hours: ${shift.totalHours || 'none'}`);
+      });
+    }
     
     // Count shifts per medic after filtering
     const countByMedic = filtered.reduce((acc, shift) => {
@@ -107,61 +120,70 @@ const Report = () => {
       return acc;
     }, {} as Record<string, number>);
     
-    console.log("Shifts per medic after filtering:", countByMedic);
+    console.log("calculateMedicHours: Shifts per medic after filtering:", countByMedic);
     
-    // Collect all hours by medic in raw format
+    // Process each shift and calculate total minutes per medic
     filtered.forEach(shift => {
       const medicName = shift.medicName;
-      // Use reported hours if available, otherwise calculated hours
-      const hoursStr = shift.reportedHours && shift.reportedHours !== shift.totalHours 
-        ? shift.reportedHours 
-        : shift.totalHours;
       
-      // Initialize array for medic if not exists
-      if (!medicHoursRaw[medicName]) {
+      if (!medicName) {
+        console.warn("calculateMedicHours: Skipping shift with no medic name", shift);
+        return;
+      }
+      
+      // Initialize if not exists
+      if (!medicHours[medicName]) {
+        medicHours[medicName] = 0;
         medicHoursRaw[medicName] = [];
       }
       
-      // Add hours to medic's array
-      if (hoursStr) {
-        medicHoursRaw[medicName].push(hoursStr);
-        console.log(`Adding shift for ${medicName}: ${hoursStr}`);
-      } else {
-        console.warn(`Skipping invalid hours format for ${medicName}:`, hoursStr);
+      // Calculate minutes for this shift - prefer reported hours if available
+      let shiftMinutes = 0;
+      
+      if (shift.reportedHours) {
+        // Use manually reported hours
+        shiftMinutes = parseTimeToMinutes(shift.reportedHours);
+        console.log(`calculateMedicHours: Using reported hours for ${medicName}: ${shift.reportedHours} -> ${shiftMinutes} minutes`);
+      } else if (shift.totalHours) {
+        // Use calculated hours
+        shiftMinutes = parseTimeToMinutes(shift.totalHours);
+        console.log(`calculateMedicHours: Using calculated hours for ${medicName}: ${shift.totalHours} -> ${shiftMinutes} minutes`);
+      } else if (shift.startTime && shift.endTime) {
+        // Calculate from start/end times
+        shiftMinutes = calculateTimeDifference(shift.startTime, shift.endTime);
+        console.log(`calculateMedicHours: Calculated from times for ${medicName}: ${shift.startTime}-${shift.endTime} -> ${shiftMinutes} minutes`);
+      }
+      
+      // Skip if we couldn't calculate minutes
+      if (shiftMinutes <= 0) {
+        console.warn(`calculateMedicHours: Zero or negative minutes calculated for ${medicName}, skipping shift`, shift);
+        return;
+      }
+      
+      // Add to total
+      medicHours[medicName] += shiftMinutes;
+      
+      // Store raw values for debugging
+      if (shift.reportedHours) {
+        medicHoursRaw[medicName].push(shift.reportedHours);
+      } else if (shift.totalHours) {
+        medicHoursRaw[medicName].push(shift.totalHours);
       }
     });
     
-    // Store raw hours for debugging
-    // @ts-ignore
-    window.debugShiftData.medicHoursRaw = {...medicHoursRaw};
-    
-    // Calculate total minutes per medic using our time utility functions
-    Object.entries(medicHoursRaw).forEach(([medicName, hoursList]) => {
-      // Use sumTimeStrings to get accurate total minutes
-      const totalMinutes = sumTimeStrings(hoursList);
-      
-      // Store total minutes
-      medicHours[medicName] = totalMinutes;
-      
-      // Log final total
-      console.log(`Final total for ${medicName}: ${totalMinutes} minutes (${formatHoursMinutes(totalMinutes)})`);
-      
-      // Store for debugging
-      // @ts-ignore
-      window.debugShiftData.calculations.push({
-        medicName,
-        hoursList,
-        totalMinutes,
-        formattedTime: formatHoursMinutes(totalMinutes)
-      });
+    // Log final totals
+    console.log("calculateMedicHours: Final hour totals per medic:");
+    Object.entries(medicHours).forEach(([name, minutes]) => {
+      console.log(`  ${name}: ${minutes} minutes (${formatHoursMinutes(minutes)})`);
     });
     
-    // Store final results for debugging
+    // Store for debugging
+    // @ts-ignore
+    window.debugShiftData.medicHoursRaw = {...medicHoursRaw};
     // @ts-ignore
     window.debugShiftData.medicHours = {...medicHours};
-    console.log('Final medicHours:', medicHours);
-    console.log("=========== DEBUG: Finished calculateMedicHours ===========");
     
+    console.log("=========== DEBUG: Finished calculateMedicHours ===========");
     return medicHours;
   };
 

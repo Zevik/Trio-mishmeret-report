@@ -2,19 +2,22 @@
  * Time utility functions for the application
  */
 
-// Maximum reasonable minutes for validation (24 hours)
-const MAX_REASONABLE_MINUTES = 24 * 60;
+// Constants
+export const MAX_REASONABLE_MINUTES = 24 * 60; // 24 hours in minutes
 
 /**
  * Formats minutes into a human-readable 'HH:MM' format
  */
 export function formatHoursMinutes(totalMinutes: number): string {
-  // Handle negative or zero minutes
-  if (totalMinutes <= 0) return '0:00';
+  // Handle negative, NaN, or invalid minutes
+  if (isNaN(totalMinutes) || totalMinutes <= 0) return '0:00';
+  
+  // Cap extremely large values to prevent display issues
+  const cappedMinutes = Math.min(totalMinutes, 9999 * 60); // Cap at 9999 hours
   
   // Calculate hours and remaining minutes
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = Math.floor(totalMinutes % 60);
+  const hours = Math.floor(cappedMinutes / 60);
+  const minutes = Math.floor(cappedMinutes % 60);
   
   // Format with leading zeros for minutes when needed
   return `${hours}:${minutes.toString().padStart(2, '0')}`;
@@ -125,28 +128,47 @@ export function parseTimeToMinutes(timeStr: string): number {
  * Sum multiple time strings to get total minutes
  */
 export function sumTimeStrings(timeStrings: string[]): number {
-  if (!Array.isArray(timeStrings) || timeStrings.length === 0) return 0;
+  if (!Array.isArray(timeStrings) || timeStrings.length === 0) {
+    console.log("sumTimeStrings: Empty or non-array input, returning 0");
+    return 0;
+  }
   
   let totalMinutes = 0;
   
   // Log the calculation process
-  console.log(`Summing ${timeStrings.length} time strings:`);
+  console.log(`sumTimeStrings: Summing ${timeStrings.length} time strings: [${timeStrings.join(', ')}]`);
   
   for (const timeStr of timeStrings) {
     try {
+      if (!timeStr || typeof timeStr !== 'string' || timeStr.trim() === '') {
+        console.log(`sumTimeStrings: Skipping empty time string`);
+        continue;
+      }
+      
       const minutes = parseTimeToMinutes(timeStr);
       
       // Log each conversion step
-      console.log(`  "${timeStr}" → ${minutes} minutes`);
+      console.log(`sumTimeStrings: "${timeStr}" → ${minutes} minutes`);
+      
+      // Skip invalid values (negative or excessive)
+      if (minutes < 0) {
+        console.warn(`sumTimeStrings: Negative minutes value (${minutes}) from "${timeStr}", skipping`);
+        continue;
+      }
+      
+      if (minutes > MAX_REASONABLE_MINUTES) {
+        console.warn(`sumTimeStrings: Excessive minutes value (${minutes}) from "${timeStr}", skipping`);
+        continue;
+      }
       
       totalMinutes += minutes;
-      console.log(`  Running total: ${totalMinutes} minutes (${formatHoursMinutes(totalMinutes)})`);
+      console.log(`sumTimeStrings: Running total: ${totalMinutes} minutes (${formatHoursMinutes(totalMinutes)})`);
     } catch (error) {
-      console.error(`Error processing time: ${timeStr}`, error);
+      console.error(`sumTimeStrings: Error processing time: "${timeStr}":`, error);
     }
   }
   
-  console.log(`Final total: ${totalMinutes} minutes (${formatHoursMinutes(totalMinutes)})`);
+  console.log(`sumTimeStrings: Final total: ${totalMinutes} minutes (${formatHoursMinutes(totalMinutes)})`);
   return totalMinutes;
 }
 
@@ -236,72 +258,104 @@ export const calculateDurationMinutes = (startTime: string, endTime: string): nu
   }
 };
 
-// Calculate the difference between two dates in minutes
+/**
+ * Calculates the time difference between two time strings in minutes
+ * Supports multiple formats:
+ * - HH:MM
+ * - Decimal hours (e.g., "1.5")
+ */
 export const calculateTimeDifference = (startTime: string, endTime: string): number => {
-  // Parse the time strings and create Date objects
-  const start = new Date(startTime);
-  const end = new Date(endTime);
-
-  // If either date is invalid, return 0
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-    return 0;
-  }
-
-  // Calculate the difference in milliseconds
-  const diffMs = end.getTime() - start.getTime();
-  
-  // Convert to minutes
-  return Math.round(diffMs / (1000 * 60));
-};
-
-// Parse date string in multiple formats
-export const parseDate = (dateStr: string): Date | null => {
-  if (!dateStr || typeof dateStr !== 'string') return null;
+  if (!startTime || !endTime) return 0;
   
   try {
-    const trimmedDateStr = dateStr.trim();
+    // Try to parse both times as minutes
+    let startMinutes = parseTimeToMinutes(startTime);
+    let endMinutes = parseTimeToMinutes(endTime);
     
-    // Try DD.MM.YYYY format (dots)
-    if (trimmedDateStr.includes('.')) {
-      const parts = trimmedDateStr.split('.');
-      if (parts.length === 3) {
-        const [day, month, year] = parts.map(Number);
-        if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-          // Create date object (month is 0-based in JavaScript)
-          const date = new Date(year, month - 1, day);
-          // Validate the date
-          if (!isNaN(date.getTime())) return date;
-        }
-      }
+    // Validate parsed times
+    if (startMinutes < 0 || startMinutes >= 24 * 60) {
+      console.warn(`Invalid start time (outside 0-24h range): ${startTime} -> ${startMinutes} minutes`);
+      startMinutes = 0;
     }
     
-    // Try DD/MM/YYYY format (slashes)
-    if (trimmedDateStr.includes('/')) {
-      const parts = trimmedDateStr.split('/');
-      if (parts.length === 3) {
-        const [day, month, year] = parts.map(Number);
-        if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-          // Create date object (month is 0-based in JavaScript)
-          const date = new Date(year, month - 1, day);
-          // Validate the date
-          if (!isNaN(date.getTime())) return date;
-        }
-      }
+    if (endMinutes < 0 || endMinutes >= 24 * 60) {
+      console.warn(`Invalid end time (outside 0-24h range): ${endTime} -> ${endMinutes} minutes`);
+      endMinutes = 0;
     }
     
-    // Try ISO format (YYYY-MM-DD)
-    if (trimmedDateStr.includes('-')) {
-      const date = new Date(trimmedDateStr);
-      if (!isNaN(date.getTime())) return date;
+    // If both times are invalid, return 0
+    if (startMinutes === 0 && endMinutes === 0) return 0;
+    
+    // Handle overnight shifts (when end time is less than start time)
+    if (endMinutes < startMinutes) {
+      return (24 * 60) - startMinutes + endMinutes;
     }
     
-    // Try direct JS date parsing as a last resort
-    const date = new Date(trimmedDateStr);
-    if (!isNaN(date.getTime())) return date;
-    
-    return null;
+    return endMinutes - startMinutes;
   } catch (error) {
-    console.error(`Error parsing date: ${dateStr}`, error);
+    console.error(`Error calculating time difference between "${startTime}" and "${endTime}":`, error);
+    return 0;
+  }
+};
+
+/**
+ * Parses a date string in DD.MM.YYYY or DD/MM/YYYY format
+ * Returns a valid Date object or null if invalid
+ */
+export const parseDate = (dateStr: string): Date | null => {
+  if (!dateStr || typeof dateStr !== 'string') {
+    return null;
+  }
+  
+  try {
+    // Clean the input string
+    const cleanDateStr = dateStr.trim();
+    
+    // Check if contains separators (. or /)
+    if (cleanDateStr.includes('.') || cleanDateStr.includes('/')) {
+      // Replace any . with / for consistent handling
+      const normalizedDateStr = cleanDateStr.replace(/\./g, '/');
+      
+      // Split the components
+      const parts = normalizedDateStr.split('/');
+      
+      if (parts.length === 3) {
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1; // Months are 0-indexed in JS
+        const year = parseInt(parts[2], 10);
+        
+        // Validate ranges
+        if (
+          isNaN(day) || day < 1 || day > 31 ||
+          isNaN(month) || month < 0 || month > 11 ||
+          isNaN(year) || year < 1900 || year > 2100
+        ) {
+          return null;
+        }
+        
+        // Create date object and validate
+        const date = new Date(year, month, day);
+        
+        // Verify the date is valid by checking if values match after construction
+        if (
+          date.getDate() !== day ||
+          date.getMonth() !== month ||
+          date.getFullYear() !== year
+        ) {
+          // Date is invalid (like Feb 30)
+          return null;
+        }
+        
+        return date;
+      }
+    }
+    
+    // Try standard JS date parsing as fallback
+    const date = new Date(cleanDateStr);
+    return !isNaN(date.getTime()) ? date : null;
+    
+  } catch (error) {
+    console.error(`Error parsing date "${dateStr}":`, error);
     return null;
   }
 };
