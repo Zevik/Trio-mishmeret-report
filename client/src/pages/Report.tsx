@@ -54,6 +54,10 @@ const Report = () => {
   const [summary, setSummary] = useState<{ [medicName: string]: number }>({});
 
   const calculateMedicHours = (shifts: ShiftRecord[], month: string) => {
+    console.log("=========== DEBUG: Starting calculateMedicHours ===========");
+    
+    // לוגיקה חדשה לחישוב שעות לפי רפואן
+    const medicHoursRaw: { [medicName: string]: string[] } = {};
     const medicHours: { [medicName: string]: number } = {};
     
     // המידע יוצג במשתנה גלובלי לצורך דיבאג
@@ -61,7 +65,8 @@ const Report = () => {
     window.debugShiftData = {
       shifts: [...shifts],
       month,
-      calculations: []
+      calculations: [],
+      medicHoursRaw: {}
     };
     
     // Filter by selected month if any
@@ -77,91 +82,73 @@ const Report = () => {
         return shiftMonth === month;
       }) : shifts;
     
-    console.log('Filtered shifts for calculation:', filtered.length);
+    console.log(`Filtered shifts for calculation: ${filtered.length}`);
     
-    // Calculate hours for each medic
+    // אסוף את כל השעות לפי רפואן בפורמט המקורי
     filtered.forEach(shift => {
       const medicName = shift.medicName;
+      // בחר משך זמן מדווח אם קיים, אחרת משך זמן מחושב
       const hoursStr = shift.reportedHours && shift.reportedHours !== shift.totalHours 
         ? shift.reportedHours 
         : shift.totalHours;
       
-      // בדוק האם מחרוזת השעות בפורמט תקין
-      if (!hoursStr || typeof hoursStr !== 'string') {
-        console.warn(`Invalid hours format for ${medicName}:`, hoursStr);
-        // @ts-ignore
-        window.debugShiftData.calculations.push({
-          medicName,
-          hoursStr,
-          error: 'Invalid format',
-          shift
-        });
-        return; // דלג על רשומה זו
+      // אתחל מערך לרפואן אם לא קיים
+      if (!medicHoursRaw[medicName]) {
+        medicHoursRaw[medicName] = [];
       }
       
-      // Extract hours and minutes from the format "HH:MM"
-      const timeParts = hoursStr.trim().split(':');
-      
-      // ודא שיש לנו לפחות שעות ודקות
-      if (timeParts.length < 2) {
-        console.warn(`Invalid time format for ${medicName}:`, hoursStr);
-        // @ts-ignore
-        window.debugShiftData.calculations.push({
-          medicName,
-          hoursStr,
-          error: 'Missing hours or minutes',
-          shift
-        });
-        return; // דלג על רשומה זו
+      // הוסף את השעות למערך של הרפואן
+      if (hoursStr && typeof hoursStr === 'string' && hoursStr.includes(':')) {
+        medicHoursRaw[medicName].push(hoursStr);
+        console.log(`Adding shift for ${medicName}: ${hoursStr}`);
+      } else {
+        console.warn(`Skipping invalid hours format for ${medicName}:`, hoursStr);
       }
+    });
+    
+    // @ts-ignore
+    window.debugShiftData.medicHoursRaw = {...medicHoursRaw};
+    
+    // חשב את סך הדקות לפי רפואן
+    Object.entries(medicHoursRaw).forEach(([medicName, hoursList]) => {
+      let totalMinutes = 0;
       
-      // המר את השעות והדקות למספרים
-      const hours = parseInt(timeParts[0], 10);
-      const minutes = parseInt(timeParts[1], 10);
+      console.log(`Calculating total for ${medicName} (${hoursList.length} shifts):`);
       
-      // בדוק שההמרה תקינה
-      if (isNaN(hours) || isNaN(minutes)) {
-        console.warn(`Invalid numeric value in time for ${medicName}:`, hoursStr, hours, minutes);
-        // @ts-ignore
-        window.debugShiftData.calculations.push({
-          medicName,
-          hoursStr,
-          error: 'NaN in hours or minutes',
-          hours,
-          minutes,
-          shift
-        });
-        return; // דלג על רשומה זו
-      }
+      hoursList.forEach(hoursStr => {
+        // המר את מחרוזת השעות לדקות
+        const timeParts = hoursStr.trim().split(':');
+        const hours = parseInt(timeParts[0], 10);
+        const minutes = parseInt(timeParts[1], 10);
+        
+        if (!isNaN(hours) && !isNaN(minutes)) {
+          const shiftMinutes = (hours * 60) + minutes;
+          totalMinutes += shiftMinutes;
+          console.log(`  ${hoursStr} => ${hours}h ${minutes}m (${shiftMinutes} minutes) => running total: ${totalMinutes} minutes`);
+        } else {
+          console.warn(`  Invalid time format: ${hoursStr}`);
+        }
+      });
       
-      // חשב את סך הדקות
-      const totalMinutes = (hours * 60) + minutes;
+      // שמור את סך הדקות
+      medicHours[medicName] = totalMinutes;
+      console.log(`Final total for ${medicName}: ${totalMinutes} minutes (${formatHoursMinutes(totalMinutes)})`);
       
-      // הוסף למונה של הרפואן
-      if (!medicHours[medicName]) {
-        medicHours[medicName] = 0;
-      }
-      
-      medicHours[medicName] += totalMinutes;
-      
-      // שמירת נתוני הדיבאג במשתנה גלובלי
+      // שמור לדיבאג
       // @ts-ignore
       window.debugShiftData.calculations.push({
         medicName,
-        hoursStr,
-        hours,
-        minutes,
+        hoursList,
         totalMinutes,
-        runningTotal: medicHours[medicName],
-        shift
+        formattedTime: formatHoursMinutes(totalMinutes)
       });
-      
-      console.log(`Adding shift for ${medicName}: hoursStr=${hoursStr}, hours=${hours}, minutes=${minutes}, totalMinutes=${totalMinutes}, runningTotal=${medicHours[medicName]}`);
     });
     
     // @ts-ignore
     window.debugShiftData.medicHours = {...medicHours};
     console.log('Final medicHours:', medicHours);
+    console.log("=========== DEBUG: Finished calculateMedicHours ===========");
+    
     return medicHours;
   };
 
