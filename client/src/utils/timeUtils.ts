@@ -66,12 +66,13 @@ export const timeToMinutes = (timeStr: string): number => {
  * מעצב דקות לפורמט של שעות:דקות
  */
 export const formatHoursMinutes = (minutes: number): string => {
-  if (isNaN(minutes) || minutes < 0) return '00:00';
+  if (minutes < 0) {
+    return '0:00';
+  }
   
   const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  
-  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+  const remainingMinutes = minutes % 60;
+  return `${hours}:${remainingMinutes.toString().padStart(2, '0')}`;
 };
 
 /**
@@ -94,4 +95,39 @@ export const calculateDurationMinutes = (startTime: string, endTime: string): nu
     console.error('Error calculating duration:', error);
     return 0;
   }
+};
+
+// Calculate the difference between two dates in minutes
+export const calculateTimeDifference = (startTime: string, endTime: string): number => {
+  // Parse the time strings and create Date objects
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+
+  // If either date is invalid, return 0
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    return 0;
+  }
+
+  // Calculate the difference in milliseconds
+  const diffMs = end.getTime() - start.getTime();
+  
+  // Convert to minutes
+  return Math.round(diffMs / (1000 * 60));
+};
+
+// Parse date string in format DD.MM.YYYY
+export const parseDate = (dateStr: string): Date | null => {
+  const parts = dateStr.split('.');
+  if (parts.length !== 3) return null;
+  
+  const [day, month, year] = parts.map(Number);
+  if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+  
+  // Create date object (month is 0-based in JavaScript)
+  const date = new Date(year, month - 1, day);
+  
+  // Validate the date
+  if (isNaN(date.getTime())) return null;
+  
+  return date;
 };

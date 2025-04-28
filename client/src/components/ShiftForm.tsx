@@ -1,297 +1,219 @@
-import { useEffect } from "react";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { useShifts } from '../contexts/ShiftContext';
+import { formatHoursMinutes, calculateTimeDifference, parseDate } from '../utils/timeUtils';
+import { Shift } from '../types/shift';
+import { useToast } from '../contexts/ToastContext';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent } from "@/components/ui/card";
-import { useShiftForm } from "@/context/ShiftFormContext";
 import UserIdentification from "./UserIdentification";
 import ShiftDetails from "./ShiftDetails";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
 import { submitFormToSheets, fetchUserByIdFromSheet } from "@/utils/googleSheetsUpdated";
 
-export default function ShiftForm() {
-  const { formData, formState, setFormData, setFormState, resetForm } = useShiftForm();
-  const { toast } = useToast();
+interface ShiftFormProps {
+  shift?: Shift;
+  onClose: () => void;
+}
 
-  // Check if there's a stored userId on mount
+const ShiftForm: React.FC<ShiftFormProps> = ({ shift, onClose }) => {
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const { addShift, updateShift } = useShifts();
+  const { showToast } = useToast();
+  const navigate = useNavigate();
+
+  const [formData, setFormData] = useState<Partial<Shift>>({
+    date: shift?.date || '',
+    startTime: shift?.startTime || '',
+    endTime: shift?.endTime || '',
+    totalHours: shift?.totalHours || 0,
+    notes: shift?.notes || '',
+    userId: user?.id || '',
+  });
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
   useEffect(() => {
-    const storedUserId = localStorage.getItem('userId');
-    if (storedUserId && storedUserId === formData.userId && !formState.isUserVerified) {
-      // Auto-verify if ID exists and is the same as what's in the form
-      handleVerifyUser();
+    if (shift) {
+      setFormData({
+        date: shift.date,
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        totalHours: shift.totalHours,
+        notes: shift.notes,
+        userId: user?.id || '',
+      });
     }
-  }, []);
+  }, [shift, user]);
 
-  const handleVerifyUser = async () => {
-    if (!formData.userId || formData.userId.length < 5) {
-      setFormState({ formError: "מספר תעודת זהות חייב להיות לפחות 5 ספרות" });
-      return;
-    }
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
 
-    setFormState({ isFormSubmitting: true, formError: null });
-
-    try {
-      // Fetch user data from the "כרטיס רפואן" sheet
-      const userResult = await fetchUserByIdFromSheet(formData.userId);
-      
-      if (userResult) {
-        setFormData({ userName: userResult });
-        setFormState({ isUserVerified: true });
-        
-        // Store userId in localStorage for future visits
-        localStorage.setItem('userId', formData.userId);
-        
-        toast({
-          title: "משתמש אומת בהצלחה",
-          description: `שלום, ${userResult}`,
-        });
-      } else {
-        setFormState({ formError: "מספר תעודת זהות לא נמצא במערכת" });
-        toast({
-          title: "שגיאה באימות",
-          description: "מספר תעודת זהות לא נמצא במערכת",
-          variant: "destructive",
-        });
+    if (!formData.date) {
+      newErrors.date = t('errors.required');
+    } else {
+      const parsedDate = parseDate(formData.date);
+      if (!parsedDate) {
+        newErrors.date = t('errors.invalidDate');
       }
-    } catch (error) {
-      console.error("Error verifying user:", error);
-      setFormState({ 
-        formError: "אירעה שגיאה באימות המשתמש. אנא נסה שוב." 
-      });
-      toast({
-        title: "שגיאה באימות",
-        description: "אירעה שגיאה בשרת. אנא נסה שוב מאוחר יותר.",
-        variant: "destructive",
-      });
-    } finally {
-      setFormState({ isFormSubmitting: false });
     }
+
+    if (!formData.startTime) {
+      newErrors.startTime = t('errors.required');
+    }
+
+    if (!formData.endTime) {
+      newErrors.endTime = t('errors.required');
+    }
+
+    if (formData.startTime && formData.endTime) {
+      const start = new Date(`${formData.date}T${formData.startTime}`);
+      const end = new Date(`${formData.date}T${formData.endTime}`);
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        newErrors.time = t('errors.invalidTime');
+      } else if (end <= start) {
+        newErrors.time = t('errors.endBeforeStart');
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-
-  const handleSubmitForm = async () => {
-    // Form validation
-    if (!formData.shiftType) {
-      toast({
-        title: "שגיאה",
-        description: "אנא בחר סוג משמרת",
-        variant: "destructive",
-      });
+    if (!validateForm()) {
       return;
     }
-
-    if (!formData.sessionDate || !formData.startTime || !formData.endTime) {
-      toast({
-        title: "שגיאה",
-        description: "אנא מלא את כל שדות החובה",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // אימות פורמט שעות תקין
-    const { isValidTimeFormat, isValidDuration } = await import('@/utils/validation');
-    
-    // בדיקת שעת התחלה
-    if (!isValidTimeFormat(formData.startTime)) {
-      toast({
-        title: "שגיאה בפורמט שעה",
-        description: "שעת התחלה אינה בפורמט תקין. אנא הזן שעה בפורמט 00:00 עד 23:59",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // בדיקת שעת סיום
-    if (!isValidTimeFormat(formData.endTime)) {
-      toast({
-        title: "שגיאה בפורמט שעה",
-        description: "שעת סיום אינה בפורמט תקין. אנא הזן שעה בפורמט 00:00 עד 23:59",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // בדיקת משך ידני (אם הוזן)
-    if (formData.manualDuration && !isValidDuration(formData.manualDuration)) {
-      toast({
-        title: "שגיאה בפורמט שעה",
-        description: "משך משמרת ידני אינו בפורמט תקין. אנא הזן שעה בפורמט 00:00 עד 23:59",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if ((formData.shiftType === "הכשרה" && !formData.instructorName) ||
-        (formData.shiftType !== "הכשרה" && !formData.doctorName)) {
-      toast({
-        title: "שגיאה",
-        description: "אנא הזן שם רופא או מדריך",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setFormState({ isFormSubmitting: true, formError: null });
 
     try {
-      // Mark if this is a demo request specifically
-      const dataToSubmit = formData.shiftType === 'דמו' ? { ...formData, isDemo: true } : formData;
-      
-      const result = await submitFormToSheets(dataToSubmit);
-      setFormState({ isFormSubmitted: true });
-      
-      // Show warning toast if we're in simulated success mode
-      toast({
-        title: "הדיווח נשלח בהצלחה",
-        description: formData.shiftType === 'דמו' 
-          ? "נתוני דמו התקבלו בהצלחה במערכת" 
-          : "פרטי המשמרת נשמרו במערכת",
-        variant: "default",
-      });
-      
+      if (shift) {
+        await updateShift(shift.id, formData as Shift);
+        showToast(t('shift.updated'), 'success');
+      } else {
+        await addShift(formData as Shift);
+        showToast(t('shift.added'), 'success');
+      }
+      onClose();
     } catch (error) {
-      console.error("Error submitting form:", error);
-      setFormState({ 
-        formError: "אירעה שגיאה בשליחת הטופס. אנא נסה שוב." 
-      });
-      toast({
-        title: "שגיאה בשליחה",
-        description: "אירעה שגיאה בשליחת הטופס. אנא נסה שוב.",
-        variant: "destructive",
-      });
-    } finally {
-      setFormState({ isFormSubmitting: false });
+      showToast(t('errors.saveFailed'), 'error');
     }
   };
 
-  const handleNewReport = () => {
-    resetForm();
-    setFormState({ isFormSubmitted: false });
-  };
-
-  const handleTryAgain = () => {
-    setFormState({ formError: null });
+  const handleTimeChange = (field: 'startTime' | 'endTime', value: string) => {
+    setFormData(prev => {
+      const newData = { ...prev, [field]: value };
+      
+      if (newData.startTime && newData.endTime && newData.date) {
+        const start = new Date(`${newData.date}T${newData.startTime}`);
+        const end = new Date(`${newData.date}T${newData.endTime}`);
+        
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end > start) {
+          const minutes = calculateTimeDifference(
+            start.toISOString(),
+            end.toISOString()
+          );
+          newData.totalHours = minutes;
+        }
+      }
+      
+      return newData;
+    });
   };
 
   return (
-    <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md overflow-hidden">
-      {/* Header */}
-      <div className="bg-primary text-white p-4 md:p-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-center">כרטיס משמרת</h1>
-        <p className="text-center mt-1 text-white/80">מערכת דיווח משמרות</p>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700">
+          {t('shift.date')}
+        </label>
+        <input
+          type="text"
+          value={formData.date}
+          onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+          placeholder="DD.MM.YYYY"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+        />
+        {errors.date && <p className="mt-1 text-sm text-red-600">{errors.date}</p>}
       </div>
 
-      {/* User Identification */}
-      {!formState.isUserVerified && (
-        <UserIdentification 
-          userId={formData.userId}
-          onUserIdChange={(value) => setFormData({ userId: value })}
-          onVerify={handleVerifyUser}
-          isVerifying={formState.isFormSubmitting}
-          error={formState.formError}
-          userName={formData.userName}
-        />
-      )}
-
-      {/* Main Form */}
-      {formState.isUserVerified && !formState.isFormSubmitted && !formState.formError && (
-        <CardContent className="p-0">
-          <div className="p-4 md:p-6 bg-neutral-light rounded-md m-4 md:m-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center">
-                  <span className="text-lg font-bold">{formData.userName.charAt(0)}</span>
-                </div>
-                <div className="mr-3">
-                  <p className="font-medium">שלום, <span>{formData.userName}</span></p>
-                  <p className="text-sm text-neutral-darkest">אותר בהצלחה במערכת</p>
-                </div>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="text-sm border-neutral-medium hover:bg-neutral-light/80"
-                onClick={() => {
-                  // Clear local storage
-                  localStorage.removeItem('userId');
-                  // Reset form
-                  resetForm();
-                  // Set user as not verified
-                  setFormState({ isUserVerified: false });
-                  // Clear user data
-                  setFormData({ userId: "", userName: "" });
-                }}
-              >
-                החלף משתמש
-              </Button>
-            </div>
-          </div>
-
-          <ShiftDetails onSubmit={handleSubmitForm} />
-        </CardContent>
-      )}
-
-      {/* Loading Indicator */}
-      {formState.isFormSubmitting && (
-        <div className="p-6 text-center">
-          <div className="inline-block w-8 h-8 border-4 border-neutral-medium border-t-primary rounded-full animate-spin mb-4"></div>
-          <p className="text-neutral-darkest">מעבד את הנתונים...</p>
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            {t('shift.startTime')}
+          </label>
+          <input
+            type="time"
+            value={formData.startTime}
+            onChange={(e) => handleTimeChange('startTime', e.target.value)}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          />
         </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            {t('shift.endTime')}
+          </label>
+          <input
+            type="time"
+            value={formData.endTime}
+            onChange={(e) => handleTimeChange('endTime', e.target.value)}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          />
+        </div>
+      </div>
+
+      {errors.time && (
+        <p className="text-sm text-red-600">{errors.time}</p>
       )}
 
-      {/* Confirmation Message */}
-      {formState.isFormSubmitted && (
-        <Card className="p-6 bg-primary-light/10 text-center rounded-lg mx-4 md:mx-6 my-4 md:my-6">
-          <CardContent className="pt-6">
-            <div className="inline-flex items-center justify-center w-12 h-12 mb-4 bg-success/10 rounded-full text-success">
-              <CheckCircle className="w-6 h-6" />
-            </div>
-            <h3 className="text-xl font-semibold mb-2">הדיווח נשלח בהצלחה!</h3>
-            <p className="text-neutral-darkest mb-4">
-              {formData.shiftType === 'דמו' 
-                ? "נתוני משמרת דמו התקבלו בהצלחה במערכת"
-                : "פרטי המשמרת נשמרו במערכת"}
-            </p>
-            
-            {/* Simple success message */}
-            <Alert className="mb-4 bg-green-50 border-green-200 text-green-700">
-              <AlertDescription className="text-sm text-right">
-                המשמרת נרשמה בהצלחה.
-              </AlertDescription>
-            </Alert>
-            
-            <Button 
-              className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-md transition-colors"
-              onClick={handleNewReport}
-            >
-              דיווח משמרת חדשה
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+      <div>
+        <label className="block text-sm font-medium text-gray-700">
+          {t('shift.totalHours')}
+        </label>
+        <input
+          type="text"
+          value={formatHoursMinutes(formData.totalHours || 0)}
+          readOnly
+          className="mt-1 block w-full rounded-md border-gray-300 bg-gray-50 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+        />
+      </div>
 
-      {/* Error Message */}
-      {formState.formError && formState.isUserVerified && !formState.isFormSubmitting && (
-        <Card className="p-6 bg-error/10 text-center rounded-lg mx-4 md:mx-6 my-4 md:my-6">
-          <CardContent className="pt-6">
-            <div className="inline-flex items-center justify-center w-12 h-12 mb-4 bg-error/10 rounded-full text-error">
-              <AlertCircle className="w-6 h-6" />
-            </div>
-            <h3 className="text-xl font-semibold mb-2">שגיאה בשליחת הטופס</h3>
-            <p className="text-neutral-darkest mb-4">
-              {formState.formError || "אירעה שגיאה בעת שליחת הטופס. אנא נסה שוב."}
-            </p>
-            <Button 
-              className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-md transition-colors"
-              onClick={handleTryAgain}
-            >
-              נסה שוב
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700">
+          {t('shift.notes')}
+        </label>
+        <textarea
+          value={formData.notes}
+          onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+          rows={3}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+        />
+      </div>
+
+      <div className="flex justify-end space-x-3">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+        >
+          {t('common.cancel')}
+        </button>
+        <button
+          type="submit"
+          className="rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+        >
+          {shift ? t('common.update') : t('common.save')}
+        </button>
+      </div>
+    </form>
   );
-}
+};
+
+export default ShiftForm;
