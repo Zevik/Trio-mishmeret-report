@@ -98,7 +98,7 @@ const Report = () => {
       }
       
       // הוסף את השעות למערך של הרפואן
-      if (hoursStr && typeof hoursStr === 'string' && hoursStr.includes(':')) {
+      if (hoursStr) {
         medicHoursRaw[medicName].push(hoursStr);
         console.log(`Adding shift for ${medicName}: ${hoursStr}`);
       } else {
@@ -116,17 +116,54 @@ const Report = () => {
       console.log(`Calculating total for ${medicName} (${hoursList.length} shifts):`);
       
       hoursList.forEach(hoursStr => {
-        // המר את מחרוזת השעות לדקות
-        const timeParts = hoursStr.trim().split(':');
-        const hours = parseInt(timeParts[0], 10);
-        const minutes = parseInt(timeParts[1], 10);
-        
-        if (!isNaN(hours) && !isNaN(minutes)) {
-          const shiftMinutes = (hours * 60) + minutes;
-          totalMinutes += shiftMinutes;
-          console.log(`  ${hoursStr} => ${hours}h ${minutes}m (${shiftMinutes} minutes) => running total: ${totalMinutes} minutes`);
-        } else {
-          console.warn(`  Invalid time format: ${hoursStr}`);
+        try {
+          let hours = 0;
+          let minutes = 0;
+          
+          // בדוק אם זה פורמט של תאריך מלא (עם השנה 1899)
+          if (hoursStr.includes('1899') || hoursStr.startsWith('18')) {
+            // התמודדות עם פורמט הזמן של גוגל שיטס עם השנה 1899
+            const date = new Date(hoursStr);
+            if (!isNaN(date.getTime())) {
+              // הוצא רק שעות ודקות מהתאריך המלא
+              hours = date.getHours();
+              minutes = date.getMinutes();
+              console.log(`  ${hoursStr} => Parsing as Google date => ${hours}h ${minutes}m`);
+            } else {
+              console.warn(`  Failed to parse Google date format: ${hoursStr}`);
+              return; // דלג על רשומה זו
+            }
+          } 
+          // בדוק אם זה פורמט של "HH:MM"
+          else if (hoursStr.includes(':')) {
+            // המר את מחרוזת השעות לדקות
+            const timeParts = hoursStr.trim().split(':');
+            hours = parseInt(timeParts[0], 10);
+            minutes = parseInt(timeParts[1], 10);
+            console.log(`  ${hoursStr} => Parsing as HH:MM => ${hours}h ${minutes}m`);
+          }
+          // אחרת, נסה לפרש כמספר
+          else {
+            const num = parseFloat(hoursStr);
+            if (!isNaN(num)) {
+              hours = Math.floor(num);
+              minutes = Math.round((num - hours) * 60);
+              console.log(`  ${hoursStr} => Parsing as decimal hours => ${hours}h ${minutes}m`);
+            } else {
+              console.warn(`  Failed to parse as number: ${hoursStr}`);
+              return; // דלג על רשומה זו
+            }
+          }
+          
+          if (!isNaN(hours) && !isNaN(minutes)) {
+            const shiftMinutes = (hours * 60) + minutes;
+            totalMinutes += shiftMinutes;
+            console.log(`  → ${hours}h ${minutes}m (${shiftMinutes} minutes) => running total: ${totalMinutes} minutes`);
+          } else {
+            console.warn(`  Invalid parsed time: hours=${hours}, minutes=${minutes}`);
+          }
+        } catch (err) {
+          console.error(`  Error processing time ${hoursStr}:`, err);
         }
       });
       
