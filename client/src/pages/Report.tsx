@@ -72,18 +72,68 @@ const Report = () => {
     // Filter by selected month if any
     const filtered = month ? 
       shifts.filter(shift => {
-        const parsedDate = parseDate(shift.date);
-        if (!parsedDate) return false;
+        // חילוץ תאריך המשמרת מהמחרוזת
+        let shiftDate: Date | null = null;
         
-        const shiftMonth = parsedDate.toLocaleDateString('he-IL', { 
-          month: 'long', 
-          year: 'numeric' 
-        });
-        return shiftMonth === month;
+        try {
+          // בדוק אם מדובר בתאריך ISO
+          if (shift.date && shift.date.includes('T')) {
+            shiftDate = new Date(shift.date);
+            console.log(`Filtering date (ISO): ${shift.date} => ${shiftDate.toISOString()}`);
+          } 
+          // אחרת נסה לפרסר כ-DD/MM/YYYY
+          else if (shift.date && shift.date.includes('/')) {
+            const parts = shift.date.split('/');
+            if (parts.length === 3) {
+              const day = parseInt(parts[0], 10);
+              const month = parseInt(parts[1], 10) - 1; // חודשים מתחילים מ-0
+              const year = parseInt(parts[2], 10);
+              shiftDate = new Date(year, month, day);
+              console.log(`Filtering date (DD/MM/YYYY): ${shift.date} => ${shiftDate.toISOString()}`);
+            }
+          }
+          
+          // אם לא הצלחנו לפרסר, נסה לפרסר עם parseDate
+          if (!shiftDate || isNaN(shiftDate.getTime())) {
+            shiftDate = parseDate(shift.date);
+            if (shiftDate) {
+              console.log(`Filtering date (parseDate): ${shift.date} => ${shiftDate.toISOString()}`);
+            }
+          }
+          
+          // בדוק אם הצלחנו לפרסר את התאריך
+          if (!shiftDate || isNaN(shiftDate.getTime())) {
+            console.warn(`Invalid date format for filtering: ${shift.date}`);
+            return false;
+          }
+          
+          // בדוק האם התאריך מתאים לחודש הנבחר
+          const shiftMonthYear = shiftDate.toLocaleDateString('he-IL', { 
+            month: 'long', 
+            year: 'numeric' 
+          });
+          
+          const matches = shiftMonthYear === month;
+          console.log(`Filtering shift for ${shift.medicName}: ${shift.date} => ${shiftMonthYear} - matches "${month}": ${matches}`);
+          
+          return matches;
+        } catch (err) {
+          console.error(`Error filtering date: ${shift.date}`, err);
+          return false;
+        }
       }) : shifts;
-    
-    console.log(`Filtered shifts for calculation: ${filtered.length}`);
-    
+      
+      // הוסף לוג של מספר המשמרות אחרי הסינון
+      console.log(`Filtered shifts: ${filtered.length} out of ${shifts.length} total shifts`);
+      
+      // הוסף לוג של כמה משמרות יש לכל רפואן אחרי הסינון
+      const countByMedic = filtered.reduce((acc, shift) => {
+        acc[shift.medicName] = (acc[shift.medicName] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      console.log("Shifts per medic after filtering:", countByMedic);
+      
     // אסוף את כל השעות לפי רפואן בפורמט המקורי
     filtered.forEach(shift => {
       const medicName = shift.medicName;
@@ -123,14 +173,25 @@ const Report = () => {
           // בדוק אם זה פורמט של תאריך מלא (עם השנה 1899)
           if (hoursStr.includes('1899') || hoursStr.startsWith('18')) {
             // התמודדות עם פורמט הזמן של גוגל שיטס עם השנה 1899
-            const date = new Date(hoursStr);
-            if (!isNaN(date.getTime())) {
-              // הוצא רק שעות ודקות מהתאריך המלא
-              hours = date.getHours();
-              minutes = date.getMinutes();
-              console.log(`  ${hoursStr} => Parsing as Google date => ${hours}h ${minutes}m`);
-            } else {
-              console.warn(`  Failed to parse Google date format: ${hoursStr}`);
+            try {
+              const date = new Date(hoursStr);
+              
+              if (!isNaN(date.getTime())) {
+                // הוצא את משך הזמן מהשעה בתאריך המקורי
+                // תאריכי 1899 בגוגל שיטס מייצגים משך זמן בשעות ודקות בלבד
+                hours = date.getUTCHours(); // אנחנו רוצים את השעות ב-UTC
+                minutes = date.getUTCMinutes();
+                
+                // החישוב עכשיו נכון יותר, כי אנחנו מתייחסים לשעון UTC
+                // ולא מושפעים מאזור הזמן המקומי או שעון קיץ
+                
+                console.log(`  ${hoursStr} => Parsing as Google date (UTC) => ${hours}h ${minutes}m`);
+              } else {
+                console.warn(`  Failed to parse Google date format: ${hoursStr}`);
+                return; // דלג על רשומה זו
+              }
+            } catch (err) {
+              console.error(`  Error parsing Google date: ${hoursStr}`, err);
               return; // דלג על רשומה זו
             }
           } 
