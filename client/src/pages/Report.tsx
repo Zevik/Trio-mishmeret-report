@@ -56,6 +56,14 @@ const Report = () => {
   const calculateMedicHours = (shifts: ShiftRecord[], month: string) => {
     const medicHours: { [medicName: string]: number } = {};
     
+    // המידע יוצג במשתנה גלובלי לצורך דיבאג
+    // @ts-ignore
+    window.debugShiftData = {
+      shifts: [...shifts],
+      month,
+      calculations: []
+    };
+    
     // Filter by selected month if any
     const filtered = month ? 
       shifts.filter(shift => {
@@ -85,8 +93,24 @@ const Report = () => {
       }
       
       medicHours[medicName] += totalMinutes;
+      
+      // שמירת נתוני הדיבאג במשתנה גלובלי
+      // @ts-ignore
+      window.debugShiftData.calculations.push({
+        medicName,
+        hoursStr,
+        hours,
+        minutes,
+        totalMinutes,
+        runningTotal: medicHours[medicName]
+      });
+      
+      console.log(`Adding shift for ${medicName}: hoursStr=${hoursStr}, hours=${hours}, minutes=${minutes}, totalMinutes=${totalMinutes}, runningTotal=${medicHours[medicName]}`);
     });
     
+    // @ts-ignore
+    window.debugShiftData.medicHours = {...medicHours};
+    console.log('Final medicHours:', medicHours);
     return medicHours;
   };
 
@@ -360,6 +384,7 @@ const Report = () => {
     // Calculate summary
     const medicHours = calculateMedicHours(filtered, selectedMonth !== 'all' ? selectedMonth : '');
     setSummary(medicHours);
+    console.log('Summary for table:', medicHours);
   }, [selectedMonth, searchTerm, reportData]);
 
   return (
